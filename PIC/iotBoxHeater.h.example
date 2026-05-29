@@ -1,0 +1,5 @@
+// Connection Placeholders
+#define DEST_IP   "x.x.x.x"
+#define DEST_PORT "xxxx"
+#define WIFI_SSID "xxxx"
+#define WIFI_PASS "xxxxxx"
