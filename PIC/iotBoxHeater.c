@@ -117,7 +117,7 @@ void __interrupt() ISR(void) {
     if (PIR1bits.ADIF) {
         adc_val[channel] = (uint16_t)((ADRESH << 8) | ADRESL);
         PIR1bits.ADIF = 0;
-        if (channel == 0) { channel = 1; ADCON0bits.CHS = 1; ADCON0bits.GO = 1; }
+        if (channel == 0) { channel = 1; ADCON0bits.CHS = 2; ADCON0bits.GO = 1; }
         else { channel = 0; ADCON0bits.CHS = 0; }
     }
     if (INTCONbits.TMR0IF) {
@@ -143,9 +143,9 @@ float calc_celsius(uint16_t adc, float pull_down_res) {
 }
 
 void main(void) {
-    TRISA = 0x03; TRISB = 0x0F; TRISC = 0x80;
+    TRISA = 0x05; TRISB = 0x0F; TRISC = 0x80;
     LATBbits.LATB4 = 1; TRISBbits.TRISB4 = 0; 
-    ADCON1 = 0x0D; ADCON2 = 0x92; PIE1bits.ADIE = 1; ADCON0bits.ADON = 1;
+    ADCON1 = 0x0C; ADCON2 = 0x92; PIE1bits.ADIE = 1; ADCON0bits.ADON = 1;
     INTCON2bits.RBPU = 0; INTCONbits.INT0IE = 1; INTCON3bits.INT1IE = 1; 
     INTCON3bits.INT2IE = 1; INTCONbits.RBIE = 1;
     
