@@ -1,6 +1,7 @@
 Ref Des / Part Name,used,Type,Pin Number,Description
 OPTION,100,Resistor,MCLR,series resistor for MCLR pin to ICSP
 ICSPPUR,10k,Resistor,MCLR,pullup for programmer ICSP
+ICSP,yes,header,n/a,header for icsp
 LEDRESEXTRA,330,LED Resistor,n/a,LED resistor for the extra power LED.
 LEDRESMAIN,330,LED Resistor,n/a,LED resistor for the main power LED.
 REG_EXTRA,2940,Regulator,n/a,Extra Power Regulator
