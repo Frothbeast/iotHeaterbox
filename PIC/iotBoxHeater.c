@@ -184,8 +184,8 @@ void main(void) {
 
         if (flag_10hz) {
             ADCON0bits.GO = 1;
-            float t_heater = calc_celsius(adc_val[0], 620.0);
-            float t_box    = calc_celsius(adc_val[1], 47000.0);
+            float t_heater = calc_celsius(adc_val[0], 698.0);
+            float t_box    = calc_celsius(adc_val[1], 50300.0);
 
             if (btn_select) { edit_mode = !edit_mode; btn_select = 0; }
             if (btn_up) {

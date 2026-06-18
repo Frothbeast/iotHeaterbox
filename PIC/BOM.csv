@@ -1,9 +1,6 @@
 Ref Des / Part Name,used,Type,Pin Number,Description
-Polyfuse Main,,fuse,to main voltage regulator,
-Polyfuse Extra,0.9,fuse,to extra voltage regulator,
 OPTION,100,Resistor,MCLR,series resistor for MCLR pin to ICSP
-ICSPPUR,10k,Resistor,MCLR,pullup for programmer ICSP
-ICSP,yes,header,n/a,header for icsp
+ICSPPUR,20k,Resistor,MCLR,pullup for programmer ICSP
 LEDRESEXTRA,330,LED Resistor,n/a,LED resistor for the extra power LED.
 LEDRESMAIN,330,LED Resistor,n/a,LED resistor for the main power LED.
 REG_EXTRA,2940,Regulator,n/a,Extra Power Regulator
@@ -13,10 +10,11 @@ CMAIN,0.1uF,Component,n/a,0.1uF capacitor for main power regulator.
 Q21,20MHz ,Crystal/Oscillator,n/a,oscillator for PIC
 JP2,24V,Jumper/Connector,n/a,External power connection for high voltage like 24V.
 Flywire1,5V,Jumper/Connector,n/a,Jump 5V alt to fuse input of 3.3V regulator
+ICSP,yes,header,n/a,header for icsp
 PIC18LF2580,yes,Micro Controller,n/a,The main micro controller for all pin mapping.
 Q22,,Crystal/Oscillator,n/a,to RTC(Real Time Clock) Chip.
 SER8,0,Serial,RA0,RA0/ ADC CH0
-C8/PDR8,620?,Capacitor,RA0,RA0/ ADC CH0
+C8/PDR8,698,Capacitor,RA0,RA0/ ADC CH0
 X3-8,yes,Connector/Terminal,RA0,Heater Thermistor
 PUR8,,Resistor,RA0,RA0/ ADC CH0
 IN/OUT/OW,yes,header,RA1,pwr & gnd for esp-01s not using RA1
@@ -35,17 +33,17 @@ PUR18,,Resistor,RA1,RA1 (One Wire Pull-up)
 TR-A18,,FET,RA1,FET TR-A18 SMD
 TR-B18,,FET,RA1,FET TR-B18 TO-220
 SER5,0,Serial,RA2,RA2/AN2/ T2in MAX232
-PUR5,47k?,Resistor,RA2,RA2/AN2/ T2in MAX232
-C5,,Capacitor,RA2,RA2/AN2/ T2in MAX232
+PUR5,50.3k,Resistor,RA2,RA2/AN2/ T2in MAX232
 X3-5,yes,Connector/Terminal,RA2,Box Thermistor
+C5,,Capacitor,RA2,RA2/AN2/ T2in MAX232
 C4,,Capacitor,RA3,RA3/AN3/ CS for max6674
 PUR4,,Resistor,RA3,RA3/AN3/ CS for max6674
 SER4,,Serial,RA3,RA3/AN3/ CS for max6674
 X3-4,,Connector/Terminal,RA3,Ra3/AN3/ CS on Max 6674 T/C chip.
 C3,0,Capacitor,RA4,RA4/T0CKI
+X3-3,btn gnd,Connector/Terminal,RA4,RA4/T0CKI.
 PUR3,,Resistor,RA4,RA4/T0CKI
 SER3,,Serial,RA4,RA4/T0CKI
-X3-3,btn gnd,Connector/Terminal,RA4,RA4/T0CKI.
 FBD17,,Diode,RA5,Fly back diode for corresponding transistor A17 or B17.
 FUSE10A-B17,,fuse,RA5,FUSE10A use with TR-B17
 LED17,,LED,RA5,Output indicator for TR-A17 or TR-B17.
@@ -61,11 +59,11 @@ TR-A17,,FET,RA5,FET TR-A17 SMD
 TR-B17,,FET,RA5,FET TR-B17 TO-220
 X4-7,,Connector/Terminal,RA5,RA5/AN5/ Manual input to TR-A17 or TR-B17.
 SER2,0,Serial,RB0,RB0/INT0
-PUR2,10k,Resistor,RB0,RB0/INT0
+PUR2,20k,Resistor,RB0,RB0/INT0
 X3-2,yes,Connector/Terminal,RB0,Menu Button(other side to ground)
 C2,,Resistor,RB0,RB0/INT0 (Menu Button Pull-down)
 SER6,0,Serial,RB1,RB1/INT1/ SCL for timer or memory chips
-PUR6,10k,Resistor,RB1,RB1/INT1/ SCL for timer or memory chips
+PUR6,20k,Resistor,RB1,RB1/INT1/ SCL for timer or memory chips
 X3-6,yes,Connector/Terminal,RB1,Up Button(other side to ground)
 C6,,Resistor,RB1,RB1/INT1/ SCL for timer or memory chips (Up Button Pull-down)
 SER1,0,Serial,RB2,RB2/INT2
@@ -73,7 +71,7 @@ PUR1,10k,Resistor,RB2,RB2/INT2
 X3-1,yes,Connector/Terminal,RB2,Down Button(other side to ground)
 C1,,Resistor,RB2,RB2/INT2 (Down Button Pull-down)
 SER7,0,Serial,RB3,RB3/ SDA for timer or memory chips
-PUR7,10k,Resistor,RB3,RB3/ SDA for timer or memory chips
+PUR7,20k,Resistor,RB3,RB3/ SDA for timer or memory chips
 X3-7,yes,Connector/Terminal,RB3,Select Button(other side to ground)
 C7,,Resistor,RB3,RB3/ SDA for timer or memory chips (Select Button Pull-down)
 B4SER,yes,solder bridge,RB4,use for connecting RB4 to SERIAL out
@@ -121,8 +119,8 @@ TR-B14,,FET,RC0,FET TR-B14 TO-220
 X4-4,,Connector/Terminal,RC0,RC0/ Manual input to TR-A14 or TR-B14.
 SER13,100,Serial,RC1,RC1/ Manual input to TR-A13 or TR-B13
 LEDR13,1.2k,LED Resistor,RC1,LED resistor for TR-A13 or TR-B13.
-PDR13,10k,Resistor,RC1,RC1/ Manual input to TR-A13 or TR-B13
-PUOR13,10k,Resistor,RC1,Pull up output resistor for A13 or B13.
+PDR13,20k,Resistor,RC1,RC1/ Manual input to TR-A13 or TR-B13
+PUOR13,20k,Resistor,RC1,Pull up output resistor for A13 or B13.
 OUTPUT1-5,light,Output/Terminal,RC1,Low side drive power out.
 OUTPUT1-6,light,Output/Terminal,RC1,TR-A13 or TR-B13 FET low side drive.
 FUSE10A-B13,short,fuse,RC1,FUSE10A use with TR-B13
@@ -135,8 +133,8 @@ PUR13,,Resistor,RC1,RC1/ Manual input to TR-A13 or TR-B13
 TR-A13,,FET,RC1,FET TR-A13 SMD
 SER12,100,Serial,RC2,RC2/ Manual input to TR-A12 or TR-B12
 LEDR12,1.2k,LED Resistor,RC2,LED resistor for TR-A12 or TR-B12.
-PDR12,10k,Resistor,RC2,RC2/ Manual input to TR-A12 or TR-B12
-PUOR12,10k,Resistor,RC2,Pull up output resistor for A12 or B12.
+PDR12,20k,Resistor,RC2,RC2/ Manual input to TR-A12 or TR-B12
+PUOR12,20k,Resistor,RC2,Pull up output resistor for A12 or B12.
 LED12,blue,LED,RC2,Output indicator for TR-A12 or TR-B12.
 OUTPUT1-3,fan,Output/Terminal,RC2,Low side drive power out.
 OUTPUT1-4,fan,Output/Terminal,RC2,TR-A12 or TR-B12 FET low side drive.
@@ -149,8 +147,8 @@ PUR12,,Resistor,RC2,RC2/ Manual input to TR-A12 or TR-B12
 TR-A12,,FET,RC2,FET TR-A12 SMD
 SER11,100,Serial,RC3,RC3/SCK/ SCK on MAX6674 T/C chip/ Manual input to TR-A11 or TR-B11
 LEDR11,1.2k,LED Resistor,RC3,LED resistor for TR-A11 or TR-B11.
-PDR11,10k,Resistor,RC3,RC3/SCK/ SCK on MAX6674 T/C chip/ Manual input to TR-A11 or TR-B11
-PUOR11,10k,Resistor,RC3,Pull up output resistor for A11 or B11.
+PDR11,20k,Resistor,RC3,RC3/SCK/ SCK on MAX6674 T/C chip/ Manual input to TR-A11 or TR-B11
+PUOR11,20k,Resistor,RC3,Pull up output resistor for A11 or B11.
 OUTPUT1-1,heater,Output/Terminal,RC3,Low side drive power out.
 OUTPUT1-2,heater,Output/Terminal,RC3,TR-A11 or TR-B11 FET low side drive.
 LED11,red,LED,RC3,Output indicator for TR-A11 or TR-B11.
@@ -200,3 +198,5 @@ SER10,0?,Serial,RC7,RC7/ R1out MAX232
 X3-10,yes,Connector/Terminal,RC7,RC7/ R1out MAX232.
 C10,,Capacitor,RC7,RC7/ R1out MAX232
 PUR10,,Resistor,RC7,RC7/ R1out MAX232
+Polyfuse Extra,0.9,fuse,to extra voltage regulator,
+Polyfuse Main,,fuse,to main voltage regulator,
