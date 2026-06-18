@@ -1,4 +1,6 @@
 Ref Des / Part Name,used,Type,Pin Number,Description
+Polyfuse Main,,fuse,to main voltage regulator,
+Polyfuse Extra,0.9,fuse,to extra voltage regulator,
 OPTION,100,Resistor,MCLR,series resistor for MCLR pin to ICSP
 ICSPPUR,10k,Resistor,MCLR,pullup for programmer ICSP
 ICSP,yes,header,n/a,header for icsp
