@@ -1,8 +1,15 @@
+#pragma config OSC = HS         // Oscillator Selection bits (HS oscillator)
+#pragma config WDT = OFF        // Watchdog Timer Enable bit (WDT disabled)
+#pragma config PWRT = ON        // Power-up Timer Enable bit (PWRT enabled)
+#pragma config BOREN = BOHW     // Brown-out Reset Enable bits (Brown-out Reset enabled in hardware only (SBOREN is disabled))
+#pragma config LVP = OFF        // Single-Supply ICSP Enable bit (Disabled)
+#pragma config PBADEN = OFF     // PORTB A/D Enable bit (PORTB pins configured as digital I/O on Reset)
+
 #include <xc.h>
 #include <stdio.h>
 #include <math.h>
 #include <string.h>
-#include <iotBoxHeater.h>
+#include "iotBoxHeater.h"
 
 #define _XTAL_FREQ 20000000 
 
@@ -60,16 +67,20 @@ char wifi_tx_buf[24]; // Increased for hex payload
 char wifi_rx_buf[21];
 uint8_t current_rssi = 0; // New global for RSSI storage
 
-// Software Serial for Display on B4
 void soft_putch(char data) {
-    DISP_TX = 0; 
+    uint8_t gie_backup = INTCONbits.GIE; // Save current interrupt state
+    INTCONbits.GIE = 0;                  // Disable interrupts to lock bit timing
+    
+    DISP_TX = 0;                         // Start bit
     __delay_us(104); 
     for(int i=0; i<8; i++) {
         DISP_TX = (data >> i) & 0x01;
         __delay_us(104);
     }
-    DISP_TX = 1; 
+    DISP_TX = 1;                         // Stop bit
     __delay_us(104);
+    
+    INTCONbits.GIE = gie_backup;         // Restore original interrupt state
 }
 
 void lcd_cmd(uint8_t cmd) { soft_putch(cmd); __delay_ms(2); }
@@ -143,16 +154,47 @@ float calc_celsius(uint16_t adc, float pull_down_res) {
 }
 
 void main(void) {
-    TRISA = 0x05; TRISB = 0x0F; TRISC = 0x80;
-    LATBbits.LATB4 = 1; TRISBbits.TRISB4 = 0; 
-    ADCON1 = 0x0C; ADCON2 = 0x92; PIE1bits.ADIE = 1; ADCON0bits.ADON = 1;
-    INTCON2bits.RBPU = 0; INTCONbits.INT0IE = 1; INTCON3bits.INT1IE = 1; 
-    INTCON3bits.INT2IE = 1; INTCONbits.RBIE = 1;
+// 1. IMMEDIATELY kill all outputs to eliminate random startup states
+    LATC = 0x00; 
+    TRISCbits.TRISC3 = 0; // HEATER output
+    TRISCbits.TRISC2 = 0; // FAN output
+    TRISCbits.TRISC1 = 0; // LIGHT output
+
+    // 2. Hardware Output Diagnostic Flash Routine (Runs immediately on cold boot)
+    for (uint8_t i = 0; i < 2; i++) {
+        HEATER = 1; __delay_ms(250); HEATER = 0;
+        FAN    = 1; __delay_ms(250); FAN    = 0;
+        LIGHT  = 1; __delay_ms(250); LIGHT  = 0;
+    }
+
+    // 3. Clear and turn off all peripheral interrupt flags during initialization
+    INTCON = 0x00;
+    INTCON2 = 0x00;
+    INTCON3 = 0x00;
+    PIE1 = 0x00;
+
+// 4. Initialize Hardware Port Directions
+    TRISA = 0x05; 
+    TRISB = 0x0F; 
+    TRISC = 0x80;
     
-    T0CON = 0x83; INTCONbits.TMR0IE = 1;
-    SPBRG = 129; // 20MHz / 9600 Baud
-    TXSTA = 0x24; RCSTA = 0x90; 
+    // Hold TX line high so the Parallax display sees a clean idle state
+    DISP_TX = 1; 
+    TRISBbits.TRISB4 = 0; 
     
+    // Change to 0x07 to turn AN8-AN10 (Port B) into digital inputs
+    ADCON1 = 0x07; 
+    ADCON2 = 0x92; 
+    ADCON0bits.ADON = 1;
+
+    // 5. Parallax Display Safe Initialization Window
+    __delay_ms(1200);  // Allow Parallax coprocessor to fully boot up
+    lcd_cmd(17);        // Turn on backlight (Parallax cmd 17)
+    __delay_ms(5);
+    lcd_cmd(LCD_CLR);   // Clear screen and move cursor to home position
+    __delay_ms(10);     // Execution delay for clear command
+    
+    // 6. Load Configurations from EEPROM
     if(DATA_EE_Read(ADDR_INIT) == 0xA5) {
         box_setpoint = eeprom_read_f(ADDR_SP);
         fan_mode = DATA_EE_Read(ADDR_FAN);
@@ -162,8 +204,28 @@ void main(void) {
         DATA_EE_Write(ADDR_INIT, 0xA5);
     }
 
-    INTCONbits.GIE = 1; INTCONbits.PEIE = 1;
-    __delay_ms(1000); lcd_cmd(LCD_CLR);
+    // 7. Clear interrupt persistent flags to wipe any noise captured during boot
+    INTCONbits.INT0IF = 0;
+    INTCON3bits.INT1IF = 0;
+    INTCON3bits.INT2IF = 0;
+    INTCONbits.RBIF = 0;
+    INTCONbits.TMR0IF = 0;
+    PIR1bits.ADIF = 0;
+
+    // 8. Safely enable individual module interrupt masks (RBIE removed)
+    INTCON2bits.RBPU = 0; 
+    INTCONbits.INT0IE = 1; 
+    INTCON3bits.INT1IE = 1; 
+    INTCON3bits.INT2IE = 1; 
+    INTCONbits.TMR0IE = 1;
+    PIE1bits.ADIE = 1;
+
+    // 9. Enable Global Interrupts (Execution loop officially begins here)
+    INTCONbits.GIE = 1; 
+    INTCONbits.PEIE = 1;
+
+    __delay_ms(1000); 
+    lcd_cmd(LCD_CLR);
 
     uint8_t soft_pwm_cnt = 0;
 
