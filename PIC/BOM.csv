@@ -36,10 +36,10 @@ SER5,0,Serial,RA2,RA2/AN2/ T2in MAX232
 PUR5,50.3k,Resistor,RA2,RA2/AN2/ T2in MAX232
 X3-5,yes,Connector/Terminal,RA2,Box Thermistor
 C5,,Capacitor,RA2,RA2/AN2/ T2in MAX232
-C4,,Capacitor,RA3,RA3/AN3/ CS for max6674
+C4,0,Capacitor,RA3,RA3/AN3/ CS for max6674
 PUR4,,Resistor,RA3,RA3/AN3/ CS for max6674
 SER4,,Serial,RA3,RA3/AN3/ CS for max6674
-X3-4,,Connector/Terminal,RA3,Ra3/AN3/ CS on Max 6674 T/C chip.
+X3-4,box thermistor gnd,Connector/Terminal,RA3,Ra3/AN3/ CS on Max 6674 T/C chip.
 C3,0,Capacitor,RA4,RA4/T0CKI
 X3-3,btn gnd,Connector/Terminal,RA4,RA4/T0CKI.
 PUR3,,Resistor,RA4,RA4/T0CKI
@@ -67,7 +67,7 @@ PUR6,20k,Resistor,RB1,RB1/INT1/ SCL for timer or memory chips
 X3-6,yes,Connector/Terminal,RB1,Up Button(other side to ground)
 C6,,Resistor,RB1,RB1/INT1/ SCL for timer or memory chips (Up Button Pull-down)
 SER1,0,Serial,RB2,RB2/INT2
-PUR1,10k,Resistor,RB2,RB2/INT2
+PUR1,20k,Resistor,RB2,RB2/INT2
 X3-1,yes,Connector/Terminal,RB2,Down Button(other side to ground)
 C1,,Resistor,RB2,RB2/INT2 (Down Button Pull-down)
 SER7,0,Serial,RB3,RB3/ SDA for timer or memory chips
@@ -117,8 +117,8 @@ SER14,,Serial,RC0,RC0/ Manual input to TR-A14 or TR-B14
 TR-A14,,FET,RC0,FET TR-A14 SMD
 TR-B14,,FET,RC0,FET TR-B14 TO-220
 X4-4,,Connector/Terminal,RC0,RC0/ Manual input to TR-A14 or TR-B14.
-SER13,100,Serial,RC1,RC1/ Manual input to TR-A13 or TR-B13
-LEDR13,1.2k,LED Resistor,RC1,LED resistor for TR-A13 or TR-B13.
+SER13,150,Serial,RC1,RC1/ Manual input to TR-A13 or TR-B13
+LEDR13,3.32k,LED Resistor,RC1,LED resistor for TR-A13 or TR-B13.
 PDR13,20k,Resistor,RC1,RC1/ Manual input to TR-A13 or TR-B13
 PUOR13,20k,Resistor,RC1,Pull up output resistor for A13 or B13.
 OUTPUT1-5,light,Output/Terminal,RC1,Low side drive power out.
@@ -131,8 +131,8 @@ X4-3,,Connector/Terminal,RC1,
 Polyfuse-A13,,fuse,RC1,Polyfuse
 PUR13,,Resistor,RC1,RC1/ Manual input to TR-A13 or TR-B13
 TR-A13,,FET,RC1,FET TR-A13 SMD
-SER12,100,Serial,RC2,RC2/ Manual input to TR-A12 or TR-B12
-LEDR12,1.2k,LED Resistor,RC2,LED resistor for TR-A12 or TR-B12.
+SER12,150,Serial,RC2,RC2/ Manual input to TR-A12 or TR-B12
+LEDR12,3.32k,LED Resistor,RC2,LED resistor for TR-A12 or TR-B12.
 PDR12,20k,Resistor,RC2,RC2/ Manual input to TR-A12 or TR-B12
 PUOR12,20k,Resistor,RC2,Pull up output resistor for A12 or B12.
 LED12,blue,LED,RC2,Output indicator for TR-A12 or TR-B12.
@@ -145,8 +145,8 @@ X4-2,,Connector/Terminal,RC2,
 Polyfuse-A12,,fuse,RC2,Polyfuse
 PUR12,,Resistor,RC2,RC2/ Manual input to TR-A12 or TR-B12
 TR-A12,,FET,RC2,FET TR-A12 SMD
-SER11,100,Serial,RC3,RC3/SCK/ SCK on MAX6674 T/C chip/ Manual input to TR-A11 or TR-B11
-LEDR11,1.2k,LED Resistor,RC3,LED resistor for TR-A11 or TR-B11.
+SER11,150,Serial,RC3,RC3/SCK/ SCK on MAX6674 T/C chip/ Manual input to TR-A11 or TR-B11
+LEDR11,3.32k,LED Resistor,RC3,LED resistor for TR-A11 or TR-B11.
 PDR11,20k,Resistor,RC3,RC3/SCK/ SCK on MAX6674 T/C chip/ Manual input to TR-A11 or TR-B11
 PUOR11,20k,Resistor,RC3,Pull up output resistor for A11 or B11.
 OUTPUT1-1,heater,Output/Terminal,RC3,Low side drive power out.
@@ -187,14 +187,14 @@ SER19,,Serial,RC5,RC5/ Manual input to TR-A19 or TR-B19
 TR-A19,,FET,RC5,FET TR-A19 SMD
 TR-B19,,FET,RC5,FET TR-B19 TO-220
 X4-9,,Connector/Terminal,RC5,RC5/ Manual input to TR-A19 or TR-B19.
-SER9,0?,Serial,RC6,RC6/ jumper connection C6SER to use SERIAL jumper
+SER9,0,Serial,RC6,RC6/ jumper connection C6SER to use SERIAL jumper
 X3-9,yes,Connector/Terminal,RC6,ESP8266 TX/RX Connection
 C6SER,,solder bridge,RC6,use for connecting RC6 to SERIAL out
 C9,,Capacitor,RC6,RC6/ jumper connection C6SER to use SERIAL jumper
 PUR9,,Resistor,RC6,RC6/ jumper connection C6SER to use SERIAL jumper
 SERINV,yes,solder bridge,RC6/RB4,Do not populate to invert the logic out using TR-A111
 TR-A111,,Transistor/Part,RC6/RB4,MOSFET to invert TTL serial output via C6 or B4 depending on which jumper is soldered.
-SER10,0?,Serial,RC7,RC7/ R1out MAX232
+SER10,0,Serial,RC7,RC7/ R1out MAX232
 X3-10,yes,Connector/Terminal,RC7,RC7/ R1out MAX232.
 C10,,Capacitor,RC7,RC7/ R1out MAX232
 PUR10,,Resistor,RC7,RC7/ R1out MAX232
