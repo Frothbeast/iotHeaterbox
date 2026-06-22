@@ -2,9 +2,9 @@ services:
   permission_fixer:
     image: alpine
     volumes:
-      - ../iotBoxHeater:/iotBoxHeater
+      - ../iotHeaterbox:/iotHeaterbox
     command: >
-      sh -c "chmod +x /iotBoxHeater/database/schema.sh"
+      sh -c "chmod +x /iotHeaterbox/database/schema.sh"
   shared_db_container:
     image: mysql:8.0
     environment:
