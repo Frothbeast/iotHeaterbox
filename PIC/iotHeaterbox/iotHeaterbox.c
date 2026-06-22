@@ -9,7 +9,7 @@
 #include <stdio.h>
 #include <math.h>
 #include <string.h>
-#include "iotBoxHeater.h"
+#include "iotHeaterbox.h"
 
 #define _XTAL_FREQ 20000000
 
@@ -173,20 +173,86 @@ void main(void) {
             btn_menu = 0;
         }
 
-        if (flag_10hz) {
+if (flag_10hz) {
             ADCON0bits.GO = 1;
-            if (wifi_ticks >= 10) { HEATER = !HEATER; wifi_ticks = 0; }
+            if (wifi_ticks >= 10) { 
+                wifi_ticks = 0; 
+                mock_rssi++;
+                if(mock_rssi > -30) mock_rssi = -90;
+            }
 
-            // HEATER: Type 1 (Pull-down), FIXED RESISTOR 698
             float t_h = calc_celsius(adc_val[0], 698.0, 1);
-
-            // BOX: Type 0 (Pull-up), FIXED RESISTOR 50300
-            // If it still reads 127C, try changing type to 1 to see if the curve inverts
             float t_b = calc_celsius(adc_val[1], 50300.0, 0); 
 
+            if (btn_up) {
+                if (menu_state == 0) { control_active = !control_active; }
+                else if (menu_state == 1) { box_setpoint += 0.5; }
+                else if (menu_state == 2) {
+                    if (sub_menu_idx == 0) Kp += 0.1;
+                    else if (sub_menu_idx == 1) Ki += 0.01;
+                    else if (sub_menu_idx == 2) Kd += 0.01;
+                }
+                btn_up = 0;
+            }
+
+            if (btn_down) {
+                if (menu_state == 0) { LIGHT = !LIGHT; }
+                else if (menu_state == 1) { box_setpoint -= 0.5; }
+                else if (menu_state == 2) {
+                    if (sub_menu_idx == 0) Kp -= 0.1;
+                    else if (sub_menu_idx == 1) Ki -= 0.01;
+                    else if (sub_menu_idx == 2) Kd -= 0.01;
+                }
+                btn_down = 0;
+            }
+
+            if (btn_select) {
+                if (menu_state == 0) { FAN = !FAN; }
+                else if (menu_state == 1) { 
+                    eeprom_write_f(ADDR_SP, box_setpoint); 
+                }
+                else if (menu_state == 2) {
+                    sub_menu_idx = (sub_menu_idx + 1) % 4;
+                    if (sub_menu_idx == 3) {
+                        eeprom_write_f(ADDR_KP, Kp);
+                        eeprom_write_f(ADDR_KI, Ki);
+                        eeprom_write_f(ADDR_KD, Kd);
+                        sub_menu_idx = 0;
+                    }
+                }
+                btn_select = 0;
+            }
+
             char s[21];
-            sprintf(s, "Htr:%5.1f [%04X]", t_h, adc_val[0]); memcpy(vram[1], s, 20);
-            sprintf(s, "Box:%5.1f [%04X]", t_b, adc_val[1]); memcpy(vram[2], s, 20);
+            memset(vram, ' ', sizeof(vram));
+
+            if (menu_state == 0) {
+                sprintf(s, "SYS: %s  Htr:%s", control_active ? "ON " : "OFF", HEATER ? "ON " : "OFF"); memcpy(vram[0], s, strlen(s));
+                sprintf(s, "Fan: %s  Lgt:%s", FAN ? "ON " : "OFF", LIGHT ? "ON " : "OFF"); memcpy(vram[1], s, strlen(s));
+                sprintf(s, "Set: %4.1f Box:%4.1f", box_setpoint, t_b); memcpy(vram[2], s, strlen(s));
+                sprintf(s, "Heater Temp: %4.1f", t_h); memcpy(vram[3], s, strlen(s));
+            } 
+            else if (menu_state == 1) {
+                sprintf(s, "--- SETPOINT MENU ---"); memcpy(vram[0], s, strlen(s));
+                sprintf(s, "Set: %4.1f C", box_setpoint); memcpy(vram[1], s, strlen(s));
+                sprintf(s, "UP/DN to change"); memcpy(vram[2], s, strlen(s));
+                sprintf(s, "SELECT to save"); memcpy(vram[3], s, strlen(s));
+            } 
+            else if (menu_state == 2) {
+                sprintf(s, "--- PID CONFIG ---"); memcpy(vram[0], s, strlen(s));
+                sprintf(s, "%cKp: %4.1f", (sub_menu_idx == 0) ? '>' : ' ', Kp); memcpy(vram[1], s, strlen(s));
+                sprintf(s, "%cKi: %4.2f", (sub_menu_idx == 1) ? '>' : ' ', Ki); memcpy(vram[2], s, strlen(s));
+                sprintf(s, "%cKd: %4.2f [SEL->SAVE]", (sub_menu_idx == 2) ? '>' : ' ', Kd); memcpy(vram[3], s, strlen(s));
+            } 
+            else if (menu_state == 3) {
+                sprintf(s, "--- WIFI TUNING ---"); memcpy(vram[0], s, strlen(s));
+                sprintf(s, "RSSI: %d dBm", mock_rssi); memcpy(vram[1], s, strlen(s));
+                if (mock_rssi > -60) sprintf(s, "Signal: EXCELLENT");
+                else if (mock_rssi > -75) sprintf(s, "Signal: GOOD");
+                else sprintf(s, "Signal: POOR/ALIGN");
+                memcpy(vram[2], s, strlen(s));
+                sprintf(s, "Antenna Tuning Mode"); memcpy(vram[3], s, strlen(s));
+            }
 
             flag_10hz = 0;
         }
