@@ -1,4 +1,4 @@
 #!/bin/bash
 
-python heaterCollector.py &
-python heaterAPI.py
+python heaterboxCollector.py &
+python heaterboxAPI.py
