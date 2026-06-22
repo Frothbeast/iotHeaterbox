@@ -30,6 +30,9 @@
 #define ADDR_INIT  0xFF
 #define ADDR_SP    0x00
 #define ADDR_FAN   0x10
+#define ADDR_KP    0x20
+#define ADDR_KI    0x24
+#define ADDR_KD    0x28
 
 volatile float box_setpoint = 25.0;
 volatile float heater_target = 0.0;
@@ -37,8 +40,9 @@ volatile uint16_t adc_val[2];
 volatile uint8_t channel = 0;
 volatile uint8_t flag_10hz = 0;
 volatile uint8_t wifi_ticks = 0;
-volatile uint8_t menu_state = 0;
-volatile uint8_t edit_mode = 0;
+
+volatile uint8_t menu_state = 0; 
+volatile uint8_t sub_menu_idx = 0; 
 
 volatile uint8_t btn_menu = 0;
 volatile uint8_t btn_up = 0;
@@ -49,6 +53,8 @@ float Kp = 10.0, Ki = 0.5, Kd = 0.1;
 float inner_integral = 0, inner_last_error = 0;
 uint8_t duty_cycle = 0;
 uint8_t fan_mode = 0;
+uint8_t control_active = 1;
+int8_t mock_rssi = -65;
 
 float trend_buffer[60];
 uint8_t trend_idx = 0;
@@ -58,7 +64,6 @@ char vram[4][20];
 char physical_screen[4][20];
 uint8_t disp_row = 0;
 uint8_t disp_col = 0;
-uint8_t prev_edit_mode = 0xFF;
 
 void soft_putch(char data) {
     uint8_t gie_backup = INTCONbits.GIE;
@@ -140,21 +145,27 @@ void main(void) {
     TRISBbits.TRISB4 = 0; TRISCbits.TRISC3 = 0; 
     __delay_ms(1500);
     lcd_cmd(LCD_CLR);
-    lcd_write("IOT HEATER SYSTEM");
+    lcd_write("3D Print Heater");
     lcd_cmd(LCD_L2);
-    lcd_write("V1.0 INITIALIZING");
+    lcd_write("by Dan Jubenville");
     __delay_ms(2000);
     lcd_cmd(LCD_CLR); 
     __delay_ms(1500);
     lcd_cmd(17); lcd_cmd(LCD_CLR);
     
    
-    if(DATA_EE_Read(ADDR_INIT) == 0xA5) {
+if(DATA_EE_Read(ADDR_INIT) == 0xA5) {
         box_setpoint = eeprom_read_f(ADDR_SP);
         fan_mode = DATA_EE_Read(ADDR_FAN);
+        Kp = eeprom_read_f(ADDR_KP);
+        Ki = eeprom_read_f(ADDR_KI);
+        Kd = eeprom_read_f(ADDR_KD);
     } else {
         eeprom_write_f(ADDR_SP, box_setpoint);
         DATA_EE_Write(ADDR_FAN, fan_mode);
+        eeprom_write_f(ADDR_KP, Kp);
+        eeprom_write_f(ADDR_KI, Ki);
+        eeprom_write_f(ADDR_KD, Kd);
         DATA_EE_Write(ADDR_INIT, 0xA5);
     }
     
