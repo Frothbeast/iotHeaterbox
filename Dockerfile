@@ -5,8 +5,8 @@ RUN apt-get update && apt-get install -y nodejs npm build-essential && rm -rf /v
 WORKDIR /app
 ARG PUBLIC_URL
 
-ARG REACT_APP_HEATER_API_URL
-ENV REACT_APP_HEATER_API_URL=${REACT_APP_HEATER_API_URL}
+ARG REACT_APP_HEATERBOX_API_URL
+ENV REACT_APP_HEATERBOX_API_URL=${REACT_APP_HEATERBOX_API_URL}
 
 COPY database/schema.sh ./database/schema.sh
 RUN chmod +x ./database/schema.sh
