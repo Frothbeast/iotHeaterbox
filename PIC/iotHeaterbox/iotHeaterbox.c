@@ -24,46 +24,49 @@
 #define LCD_L2       148
 #define LCD_L3       168
 #define LCD_L4       188
-#define LCD_CUR_ON   13
-#define LCD_CUR_OFF  14
 
 #define ADDR_INIT  0xFF
 #define ADDR_SP    0x00
 #define ADDR_FAN   0x10
 #define ADDR_KP    0x20
 #define ADDR_KI    0x24
-#define ADDR_KD    0x28
+#define AD
 
+volatile float t_h = 0.0;
+volatile float t_b = 0.0;
+volatile uint8_t adc_ready = 0;
+volatile uint8_t isr_channel = 0;
 volatile float box_setpoint = 25.0;
 volatile float heater_target = 0.0;
 volatile uint16_t adc_val[2];
-volatile uint8_t channel = 0;
 volatile uint8_t flag_10hz = 0;
 volatile uint8_t wifi_ticks = 0;
 
 volatile uint8_t menu_state = 0; 
 volatile uint8_t sub_menu_idx = 0; 
+uint8_t last_menu_state = 0xFF;
 
-volatile uint8_t btn_menu = 0;
-volatile uint8_t btn_up = 0;
-volatile uint8_t btn_down = 0;
-volatile uint8_t btn_select = 0;
+volatile uint8_t menu_press = 0, up_press = 0, down_press = 0, select_press = 0;
+volatile uint8_t btn_menu = 0, btn_up = 0, btn_down = 0, btn_select = 0;
+volatile uint8_t btn_menu_state = 0, btn_up_state = 0, btn_down_state = 0, btn_select_state = 0;
+#define not_pressed 0
+#define was_pressed 1
+#define being_held  3
+
+volatile uint8_t *btn_pins[] = {&btn_menu, &btn_up, &btn_down, &btn_select};
+volatile uint8_t *btn_states[] = {&btn_menu_state, &btn_up_state, &btn_down_state, &btn_select_state};
+volatile uint8_t *btn_flags[] = {&menu_press, &up_press, &down_press, &select_press};
+volatile uint8_t time_to_display = 0;
+uint8_t lcd_lines[] = {LCD_L1, LCD_L2, LCD_L3, LCD_L4};
+uint8_t current_line_idx = 0;
+char display_buffer[4][21]; // 4 lines, 20 chars + null terminator
 
 float Kp = 10.0, Ki = 0.5, Kd = 0.1;
-float inner_integral = 0, inner_last_error = 0;
-uint8_t duty_cycle = 0;
 uint8_t fan_mode = 0;
 uint8_t control_active = 1;
 int8_t mock_rssi = -65;
 
-float trend_buffer[60];
-uint8_t trend_idx = 0;
-float current_trend = 0.0;
-
-char vram[4][20];
-char physical_screen[4][20];
-uint8_t disp_row = 0;
-uint8_t disp_col = 0;
+char s[24];
 
 void soft_putch(char data) {
     uint8_t gie_backup = INTCONbits.GIE;
@@ -76,6 +79,40 @@ void soft_putch(char data) {
 
 void lcd_cmd(uint8_t cmd) { soft_putch(cmd); __delay_ms(2); }
 void lcd_write(const char *str) { while(*str) soft_putch(*str++); }
+
+void poll_buttons(void) {
+    btn_menu = (PORTBbits.RB0 == 0);
+    btn_up = (PORTBbits.RB1 == 0);
+    btn_down = (PORTBbits.RB2 == 0);
+    btn_select = (PORTBbits.RB3 == 0);
+    
+    // Loop through all 4 buttons
+    for (uint8_t i = 0; i < 4; i++) {
+        if (*btn_pins[i]) {
+            switch (*btn_states[i]) {
+            case not_pressed: // button was not pressed previously
+                *btn_states[i] = was_pressed;
+                break;
+            case was_pressed: // button was pressed previously
+                *btn_states[i] = being_held;
+                break;
+            case being_held:
+                break;
+            default:
+                break;
+            }
+        } else {
+            switch (*btn_states[i]) {
+            case not_pressed: // button was not pressed previously
+                break;
+            case being_held:
+                *btn_flags[i] = 1; // flag to deal with button pressed
+                *btn_states[i] = not_pressed;
+                break;
+            }
+        }
+    }
+}
 
 void DATA_EE_Write(uint8_t addr, uint8_t data) {
     EEADR = addr; EEDATA = data;
@@ -100,181 +137,104 @@ float eeprom_read_f(uint8_t addr) {
     return val;
 }
 
-void __interrupt() ISR(void) {
+void __interrupt() ISR(void) { 
     if (PIR1bits.ADIF) {
-        adc_val[channel] = (uint16_t)((ADRESH << 8) | ADRESL);
+        adc_val[isr_channel] = (uint16_t)((uint16_t)ADRESH << 8) | ADRESL;
         PIR1bits.ADIF = 0;
-        if (channel == 0) { channel = 1; ADCON0bits.CHS = 2; ADCON0bits.GO = 1; }
-        else { channel = 0; ADCON0bits.CHS = 0; }
+        
+        adc_ready = 1; 
+
+        // Switch channel and restart
+        isr_channel = (isr_channel == 0) ? 1 : 0;
+        
+        ADCON0bits.CHS = (isr_channel == 0) ? 0 : 2;
+        
+        ADCON0bits.GO = 1;
     }
     if (INTCONbits.TMR0IF) {
         TMR0H = 0x3C; TMR0L = 0xAF;
-        flag_10hz = 1; wifi_ticks++;
+        flag_10hz = 1;
         INTCONbits.TMR0IF = 0;
     }
-    if (INTCONbits.INT0IF) { btn_menu = 1; INTCONbits.INT0IF = 0; }
-    if (INTCON3bits.INT1IF) { btn_up = 1; INTCON3bits.INT1IF = 0; }
-    if (INTCON3bits.INT2IF) { btn_down = 1; INTCON3bits.INT2IF = 0; }
-    if (INTCONbits.RBIF) {
-        uint8_t dummy = PORTB;
-        if (SELECT_PIN == 0) { btn_select = 1; }
-        INTCONbits.RBIF = 0;
-    }
 }
+
 float calc_celsius(uint16_t adc, float fixed_res, uint8_t type) {
-    if (adc <= 5) adc = 5;
-    if (adc >= 1020) adc = 1020;
-    
-    float resistance;
-    if (type == 0) {
-        // Box: Pull-up to VCC, NTC to GND
-        // If this moves the wrong way, we invert the ADC ratio
-        resistance = fixed_res * ((float)adc / (1023.0 - (float)adc));
-    } else {
-        // Heater: Pull-down to GND, NTC to VCC
-        resistance = fixed_res * ((1023.0 - (float)adc) / (float)adc);
-    }
-    
-    float temp = 1.0 / (1.0 / 298.15 + (1.0 / 4350.0) * log(resistance / 100000.0));
-    return temp - 273.15;
+    if (adc <= 5) adc = 5; if (adc >= 1020) adc = 1020;
+    float resistance = (type == 0) ? (fixed_res * ((float)adc / (1023.0 - (float)adc))) : (fixed_res * ((1023.0 - (float)adc) / (float)adc));
+    return (1.0 / (1.0 / 298.15 + (1.0 / 4350.0) * log(resistance / 100000.0))) - 273.15;
 }
 
 void main(void) {
-    LATC = 0x00; TRISC = 0x00; TRISB = 0x0F; TRISA = 0x05;
-    ADCON1 = 0x0D; ADCON2 = 0x92; ADCON0bits.ADON = 1;
-    TRISBbits.TRISB4 = 0; TRISCbits.TRISC3 = 0; 
-    __delay_ms(1500);
-    lcd_cmd(LCD_CLR);
-    lcd_write("3D Print Heater");
-    lcd_cmd(LCD_L2);
-    lcd_write("by Dan Jubenville");
+  // Configuration
+    ECANCON = 0x00; CANCON = 0x20; LATC = 0x00; TRISC = 0x00; TRISA = 0x05; TRISB = 0x0F;
+    ADCON1 = 0x0C; ADCON2 = 0x92; ADCON0bits.ADON = 1; INTCON2bits.RBPU = 0;
+    
+    // A/D channel 0 (Heater Temp)
+    ADCON0bits.CHS = 0;
+    ADCON0bits.GO = 1;
+    while(ADCON0bits.GO); // Wait for conversion to complete
+    adc_val[0] = (uint16_t)((uint16_t)ADRESH << 8) | ADRESL;
+    
+    // A/D channel 2 (Box Temp)
+    ADCON0bits.CHS = 2;
+    ADCON0bits.GO = 1;
+    while(ADCON0bits.GO); // Wait for conversion to complete
+    adc_val[1] = (uint16_t)((uint16_t)ADRESH << 8) | ADRESL;
+    
+    // Calculate initial temperatures
+    t_h = calc_celsius(adc_val[0], 698.0, 1);
+    t_b = calc_celsius(adc_val[1], 50300.0, 0);
+    
+    // Splash screen (standard delay allowed here as no other tasks are running)
     __delay_ms(2000);
-    lcd_cmd(LCD_CLR); 
-    __delay_ms(1500);
-    lcd_cmd(17); lcd_cmd(LCD_CLR);
+    lcd_cmd(LCD_CLR);
     
-   
-if(DATA_EE_Read(ADDR_INIT) == 0xA5) {
-        box_setpoint = eeprom_read_f(ADDR_SP);
-        fan_mode = DATA_EE_Read(ADDR_FAN);
-        Kp = eeprom_read_f(ADDR_KP);
-        Ki = eeprom_read_f(ADDR_KI);
-        Kd = eeprom_read_f(ADDR_KD);
-    } else {
-        eeprom_write_f(ADDR_SP, box_setpoint);
-        DATA_EE_Write(ADDR_FAN, fan_mode);
-        eeprom_write_f(ADDR_KP, Kp);
-        eeprom_write_f(ADDR_KI, Ki);
-        eeprom_write_f(ADDR_KD, Kd);
-        DATA_EE_Write(ADDR_INIT, 0xA5);
-    }
-    
-    memset(vram, ' ', sizeof(vram));
-    memset(physical_screen, 0x00, sizeof(physical_screen));
-    
-    T0CON = 0x84; INTCONbits.TMR0IE = 1; PIE1bits.ADIE = 1;
-    INTCONbits.INT0IE = 1; INTCON3bits.INT1IE = 1; INTCON3bits.INT2IE = 1;
-    INTCONbits.RBIE = 1; INTCONbits.GIE = 1; INTCONbits.PEIE = 1;
+    // Initial buffer setup
+    sprintf(display_buffer[0], "T_H:%5.1f T_B:%5.1f", t_h, t_b);
+    sprintf(display_buffer[1], "Fan:%s Light:%s", (FAN ? "ON " : "OFF"), (LIGHT ? "ON " : "OFF"));
+    sprintf(display_buffer[2], "Heater:%s", (HEATER ? "ON " : "OFF"));
+    sprintf(display_buffer[3], "Mode:%d RSSI:%d", fan_mode, mock_rssi);
+    time_to_display = 1;
 
+    // Start interrupts for main loop
+    T0CON = 0x84; INTCONbits.TMR0IE = 1; PIE1bits.ADIE = 1; INTCONbits.GIE = 1; INTCONbits.PEIE = 1;
+    ADCON0bits.CHS = 0; 
+    ADCON0bits.GO = 1;
+    lcd_cmd(0x0C);
+    lcd_cmd(17);
     while(1) {
-        if (btn_menu) {
-            eeprom_write_f(ADDR_SP, box_setpoint);
-            DATA_EE_Write(ADDR_FAN, fan_mode);
-            menu_state = (menu_state + 1) % 4;
-            btn_menu = 0;
+        
+        if (time_to_display){
+            time_to_display=0;
+            lcd_cmd(lcd_lines[current_line_idx]);
+            lcd_write(display_buffer[current_line_idx]); 
+
+            current_line_idx++;
+            if (current_line_idx >= 4) {
+                current_line_idx = 0;
+            } 
         }
 
-if (flag_10hz) {
-            ADCON0bits.GO = 1;
-            if (wifi_ticks >= 10) { 
-                wifi_ticks = 0; 
-                mock_rssi++;
-                if(mock_rssi > -30) mock_rssi = -90;
-            }
-
-            float t_h = calc_celsius(adc_val[0], 698.0, 1);
-            float t_b = calc_celsius(adc_val[1], 50300.0, 0); 
-
-            if (btn_up) {
-                if (menu_state == 0) { control_active = !control_active; }
-                else if (menu_state == 1) { box_setpoint += 0.5; }
-                else if (menu_state == 2) {
-                    if (sub_menu_idx == 0) Kp += 0.1;
-                    else if (sub_menu_idx == 1) Ki += 0.01;
-                    else if (sub_menu_idx == 2) Kd += 0.01;
-                }
-                btn_up = 0;
-            }
-
-            if (btn_down) {
-                if (menu_state == 0) { LIGHT = !LIGHT; }
-                else if (menu_state == 1) { box_setpoint -= 0.5; }
-                else if (menu_state == 2) {
-                    if (sub_menu_idx == 0) Kp -= 0.1;
-                    else if (sub_menu_idx == 1) Ki -= 0.01;
-                    else if (sub_menu_idx == 2) Kd -= 0.01;
-                }
-                btn_down = 0;
-            }
-
-            if (btn_select) {
-                if (menu_state == 0) { FAN = !FAN; }
-                else if (menu_state == 1) { 
-                    eeprom_write_f(ADDR_SP, box_setpoint); 
-                }
-                else if (menu_state == 2) {
-                    sub_menu_idx = (sub_menu_idx + 1) % 4;
-                    if (sub_menu_idx == 3) {
-                        eeprom_write_f(ADDR_KP, Kp);
-                        eeprom_write_f(ADDR_KI, Ki);
-                        eeprom_write_f(ADDR_KD, Kd);
-                        sub_menu_idx = 0;
-                    }
-                }
-                btn_select = 0;
-            }
-
-            char s[21];
-            memset(vram, ' ', sizeof(vram));
-
-            if (menu_state == 0) {
-                sprintf(s, "SYS: %s  Htr:%s", control_active ? "ON " : "OFF", HEATER ? "ON " : "OFF"); memcpy(vram[0], s, strlen(s));
-                sprintf(s, "Fan: %s  Lgt:%s", FAN ? "ON " : "OFF", LIGHT ? "ON " : "OFF"); memcpy(vram[1], s, strlen(s));
-                sprintf(s, "Set: %4.1f Box:%4.1f", box_setpoint, t_b); memcpy(vram[2], s, strlen(s));
-                sprintf(s, "Heater Temp: %4.1f", t_h); memcpy(vram[3], s, strlen(s));
-            } 
-            else if (menu_state == 1) {
-                sprintf(s, "--- SETPOINT MENU ---"); memcpy(vram[0], s, strlen(s));
-                sprintf(s, "Set: %4.1f C", box_setpoint); memcpy(vram[1], s, strlen(s));
-                sprintf(s, "UP/DN to change"); memcpy(vram[2], s, strlen(s));
-                sprintf(s, "SELECT to save"); memcpy(vram[3], s, strlen(s));
-            } 
-            else if (menu_state == 2) {
-                sprintf(s, "--- PID CONFIG ---"); memcpy(vram[0], s, strlen(s));
-                sprintf(s, "%cKp: %4.1f", (sub_menu_idx == 0) ? '>' : ' ', Kp); memcpy(vram[1], s, strlen(s));
-                sprintf(s, "%cKi: %4.2f", (sub_menu_idx == 1) ? '>' : ' ', Ki); memcpy(vram[2], s, strlen(s));
-                sprintf(s, "%cKd: %4.2f [SEL->SAVE]", (sub_menu_idx == 2) ? '>' : ' ', Kd); memcpy(vram[3], s, strlen(s));
-            } 
-            else if (menu_state == 3) {
-                sprintf(s, "--- WIFI TUNING ---"); memcpy(vram[0], s, strlen(s));
-                sprintf(s, "RSSI: %d dBm", mock_rssi); memcpy(vram[1], s, strlen(s));
-                if (mock_rssi > -60) sprintf(s, "Signal: EXCELLENT");
-                else if (mock_rssi > -75) sprintf(s, "Signal: GOOD");
-                else sprintf(s, "Signal: POOR/ALIGN");
-                memcpy(vram[2], s, strlen(s));
-                sprintf(s, "Antenna Tuning Mode"); memcpy(vram[3], s, strlen(s));
-            }
-
+        if (flag_10hz) {
             flag_10hz = 0;
+            //// get a/d values when they are ready
+            if (adc_ready) {
+                adc_ready = 0;
+                if (!isr_channel) {
+                    t_h = calc_celsius(adc_val[0], 698.0, 1);    
+                }
+                else {
+                    t_b = calc_celsius(adc_val[1], 50300.0, 0);
+                }
+            }
+            
+            poll_buttons();
+            
+            time_to_display =1;
+            sprintf(display_buffer[0], "T_H:%5.1f T_B:%5.1f", t_h, t_b);
+            sprintf(display_buffer[1], "Fan:%s Light:%s", (FAN ? "ON " : "OFF"), (LIGHT ? "ON " : "OFF"));
+            sprintf(display_buffer[2], "Heater:%s", (HEATER ? "ON " : "OFF"));
+            sprintf(display_buffer[3], "Mode:%d RSSI:%d", fan_mode, mock_rssi);
         }
-
-        if (vram[disp_row][disp_col] != physical_screen[disp_row][disp_col]) {
-            soft_putch(128 + (disp_row * 20) + disp_col);
-            soft_putch(vram[disp_row][disp_col]);
-            physical_screen[disp_row][disp_col] = vram[disp_row][disp_col];
-            __delay_us(100);
-        }
-        disp_col++;
-        if (disp_col >= 20) { disp_col = 0; disp_row++; if (disp_row >= 4) disp_row = 0; }
     }
 }
