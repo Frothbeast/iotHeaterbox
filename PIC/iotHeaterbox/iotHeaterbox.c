@@ -16,14 +16,18 @@
 #define HEATER LATCbits.LATC3
 #define FAN    LATCbits.LATC2
 #define LIGHT  LATCbits.LATC1
-#define SELECT_PIN PORTBbits.RB3
 #define DISP_TX LATBbits.LATB4
 
-#define LCD_CLR      12
-#define LCD_L1       128
-#define LCD_L2       148
-#define LCD_L3       168
-#define LCD_L4       188
+#define LCD_ON_NO_CURSOR    22
+#define LCD_BACKLIGHT_OFF   18
+#define LCD_BACKLIGHT_ON    17
+#define LCD_CLR             12
+#define LCD_L1              128
+#define LCD_L2              148
+#define LCD_L3              168
+#define LCD_L4              188
+uint8_t lcd_line_addrs[] = {LCD_L1, LCD_L2, LCD_L3, LCD_L4};
+
 
 #define ADDR_INIT  0xFF
 #define ADDR_SP    0x00
@@ -53,6 +57,13 @@ volatile uint8_t btn_menu_state = 0, btn_up_state = 0, btn_down_state = 0, btn_s
 #define was_pressed 1
 #define being_held  3
 
+#define main_menu 0
+#define setpoint_menu 1
+#define wifi_menu 2
+#define manual_menu 3
+#define pid_menu 4
+
+
 volatile uint8_t *btn_pins[] = {&btn_menu, &btn_up, &btn_down, &btn_select};
 volatile uint8_t *btn_states[] = {&btn_menu_state, &btn_up_state, &btn_down_state, &btn_select_state};
 volatile uint8_t *btn_flags[] = {&menu_press, &up_press, &down_press, &select_press};
@@ -77,14 +88,37 @@ void soft_putch(char data) {
     INTCONbits.GIE = gie_backup;
 }
 
-void lcd_cmd(uint8_t cmd) { soft_putch(cmd); __delay_ms(2); }
+void lcd_cmd_direct(uint8_t cmd) {
+    soft_putch(cmd);
+    __delay_ms(2);
+}
+
+void lcd_cmd_with_prefix(uint8_t cmd) {
+    soft_putch(255);
+    soft_putch(cmd);
+    __delay_ms(2);
+}
+
+void lcd_move_cursor(uint8_t address) {
+    // Just send the address command directly to the display
+    soft_putch(address); 
+    __delay_ms(2);
+}
+
 void lcd_write(const char *str) { while(*str) soft_putch(*str++); }
 
+uint8_t get_button_states(void) {
+    // Read PORTB, mask bits 0-3
+    // Since buttons are active-low (pressed = 0), 
+    // invert the result with ~ to make pressed = 1
+    return (~PORTB) & 0x0F;
+}
+
 void poll_buttons(void) {
-    btn_menu = (PORTBbits.RB0 == 0);
+    btn_menu = (PORTBbits.RB3 == 0);
     btn_up = (PORTBbits.RB1 == 0);
-    btn_down = (PORTBbits.RB2 == 0);
-    btn_select = (PORTBbits.RB3 == 0);
+    btn_down = (PORTBbits.RB4 == 0);
+    btn_select = (PORTBbits.RB0 == 0);
     
     // Loop through all 4 buttons
     for (uint8_t i = 0; i < 4; i++) {
@@ -166,8 +200,10 @@ float calc_celsius(uint16_t adc, float fixed_res, uint8_t type) {
 
 void main(void) {
   // Configuration
-    ECANCON = 0x00; CANCON = 0x20; LATC = 0x00; TRISC = 0x00; TRISA = 0x05; TRISB = 0x0F;
-    ADCON1 = 0x0C; ADCON2 = 0x92; ADCON0bits.ADON = 1; INTCON2bits.RBPU = 0;
+    ECANCON = 0x00;
+    CANCON = 0x20;
+    LATC = 0x00; TRISC = 0x00; TRISA = 0x05; TRISB = 0x0F;
+    ADCON1 = 0x0D; ADCON2 = 0x92; ADCON0bits.ADON = 1;
     
     // A/D channel 0 (Heater Temp)
     ADCON0bits.CHS = 0;
@@ -187,36 +223,58 @@ void main(void) {
     
     // Splash screen (standard delay allowed here as no other tasks are running)
     __delay_ms(2000);
-    lcd_cmd(LCD_CLR);
+    lcd_cmd_direct(LCD_CLR);
     
     // Initial buffer setup
-    sprintf(display_buffer[0], "T_H:%5.1f T_B:%5.1f", t_h, t_b);
-    sprintf(display_buffer[1], "Fan:%s Light:%s", (FAN ? "ON " : "OFF"), (LIGHT ? "ON " : "OFF"));
-    sprintf(display_buffer[2], "Heater:%s", (HEATER ? "ON " : "OFF"));
-    sprintf(display_buffer[3], "Mode:%d RSSI:%d", fan_mode, mock_rssi);
-    time_to_display = 1;
+    sprintf(display_buffer[0], "*Heater Box Control*");
+    sprintf(display_buffer[1], "   by Dan Jubenville");
+    sprintf(display_buffer[2], "June 2026 recovering");
+    sprintf(display_buffer[3], "from big toe surgery");
+    
+    lcd_move_cursor(lcd_line_addrs[0]);
+    lcd_write(display_buffer[LCD_L1]);
+    lcd_move_cursor(lcd_line_addrs[1]);
+    lcd_write(display_buffer[LCD_L2]);
+    lcd_move_cursor(lcd_line_addrs[2]);
+    lcd_write(display_buffer[LCD_L3]);
+    lcd_move_cursor(lcd_line_addrs[3]);
+    lcd_write(display_buffer[LCD_L4]);
 
     // Start interrupts for main loop
     T0CON = 0x84; INTCONbits.TMR0IE = 1; PIE1bits.ADIE = 1; INTCONbits.GIE = 1; INTCONbits.PEIE = 1;
     ADCON0bits.CHS = 0; 
     ADCON0bits.GO = 1;
-    lcd_cmd(0x0C);
-    lcd_cmd(17);
+    lcd_cmd_direct(LCD_ON_NO_CURSOR);
+    lcd_cmd_direct(LCD_BACKLIGHT_ON);
+    time_to_display = 1;
+    
+    sprintf(display_buffer[0], "Main Menu");
+    sprintf(display_buffer[1], "H:%5.1f B:%5.1f", t_h, t_b);
+    sprintf(display_buffer[2], "F:%d L:%d H:%d", FAN, LIGHT, HEATER);
+
+
     while(1) {
         
         if (time_to_display){
             time_to_display=0;
-            lcd_cmd(lcd_lines[current_line_idx]);
+            
+            uint8_t old_gie = INTCONbits.GIE; //save state of interrupts
+            INTCONbits.GIE = 0;// stop all interrupts
+            
+            lcd_move_cursor(lcd_line_addrs[current_line_idx]);
             lcd_write(display_buffer[current_line_idx]); 
 
             current_line_idx++;
             if (current_line_idx >= 4) {
                 current_line_idx = 0;
             } 
+            
+            INTCONbits.GIE = old_gie;// restore interrupts
         }
-
+        
         if (flag_10hz) {
             flag_10hz = 0;
+            time_to_display=1;
             //// get a/d values when they are ready
             if (adc_ready) {
                 adc_ready = 0;
@@ -230,11 +288,60 @@ void main(void) {
             
             poll_buttons();
             
-            time_to_display =1;
-            sprintf(display_buffer[0], "T_H:%5.1f T_B:%5.1f", t_h, t_b);
-            sprintf(display_buffer[1], "Fan:%s Light:%s", (FAN ? "ON " : "OFF"), (LIGHT ? "ON " : "OFF"));
-            sprintf(display_buffer[2], "Heater:%s", (HEATER ? "ON " : "OFF"));
-            sprintf(display_buffer[3], "Mode:%d RSSI:%d", fan_mode, mock_rssi);
+            if (menu_press){
+                menu_press=0;
+                menu_state++;
+                if (menu_state > pid_menu) {
+                    menu_state = main_menu;
+                }
+                lcd_cmd_direct(LCD_CLR);
+                switch (menu_state){
+                    case main_menu:
+                        sprintf(display_buffer[0], "Main Menu");
+                        sprintf(display_buffer[1], "H:%5.1f B:%5.1f", t_h, t_b);
+                        sprintf(display_buffer[2], "F:%d L:%d H:%d", FAN, LIGHT, HEATER);
+                        
+                        break;
+                    case setpoint_menu:
+                        sprintf(display_buffer[0], "Setpoint Menu");
+                        sprintf(display_buffer[1], "H:%5.1f B:%5.1f", t_h, t_b);
+                        sprintf(display_buffer[2], "F:%d L:%d H:%d", FAN, LIGHT, HEATER);
+                        break;
+                    case wifi_menu:
+                        sprintf(display_buffer[0], "WIFI Menu");
+                        sprintf(display_buffer[1], "H:%5.1f B:%5.1f", t_h, t_b);
+                        sprintf(display_buffer[2], "F:%d L:%d H:%d", FAN, LIGHT, HEATER);
+                        break;
+                    case manual_menu:
+                        sprintf(display_buffer[0], "Manual Menu");
+                        sprintf(display_buffer[1], "H:%5.1f B:%5.1f", t_h, t_b);
+                        sprintf(display_buffer[2], "F:%d L:%d H:%d", FAN, LIGHT, HEATER);
+                        break;
+                    case pid_menu:
+                        sprintf(display_buffer[0], "PID Menu");
+                        sprintf(display_buffer[1], "H:%5.1f B:%5.1f", t_h, t_b);
+                        sprintf(display_buffer[2], "F:%d L:%d H:%d", FAN, LIGHT, HEATER);
+                        break;
+                    default:
+                        sprintf(display_buffer[0], "default Menu");
+                        sprintf(display_buffer[1], "H:%5.1f B:%5.1f", t_h, t_b);
+                        sprintf(display_buffer[2], "F:%d L:%d H:%d", FAN, LIGHT, HEATER);
+                        break;
+                        
+                }
+            }
+            if (up_press){
+                up_press=0;
+                
+            }
+            if (down_press){
+                down_press=0;
+                
+            }
+            if (select_press){
+                select_press=0;
+                
+            }
         }
     }
 }
