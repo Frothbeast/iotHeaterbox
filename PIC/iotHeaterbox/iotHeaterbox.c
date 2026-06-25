@@ -533,9 +533,7 @@ void send_to_display(void) {
 }
 
 void poll_uart_for_trigger() {
-    //Check if hardware received a byte
     if (PIR1bits.RCIF) {
-        // Clear overrun if it happened
         if (RCSTAbits.OERR) { 
             RCSTAbits.CREN = 0; 
             RCSTAbits.CREN = 1; 
@@ -543,14 +541,14 @@ void poll_uart_for_trigger() {
         
         char c = RCREG;
 
-        // Check for trigger byte
         if (c == 0x02) {
-            esp_mode = 1; // Enter ESP_RX_MODE
+            esp_mode = 1; 
             rx_idx = 0;
             
-            // Send ACK
+            // Non-blocking ACK send
+            uint16_t timeout = 5000;
             TXREG = 0x06;
-            while(!TXSTAbits.TRMT); 
+            while(!TXSTAbits.TRMT && --timeout > 0); 
         }
     }
 }
@@ -559,18 +557,24 @@ uint8_t send_to_esp(char *data, uint8_t length) {
     uint8_t old_gie = INTCONbits.GIE;
     INTCONbits.GIE = 0; 
     
-    // 1. Transmit packet
+    // 1. Transmit packet with timeout
     for(uint8_t i = 0; i < length; i++) {
         TXREG = data[i];
-        while(!TXSTAbits.TRMT); 
+        uint16_t tx_timeout = 5000;
+        // Wait for buffer to clear, but break if it takes too long
+        while(!TXSTAbits.TRMT && --tx_timeout > 0); 
+        if(tx_timeout == 0) {
+            INTCONbits.GIE = old_gie;
+            return 0; // Transmit failed
+        }
     }
-    INTCONbits.GIE = old_gie; // Re-enable interrupts
+    INTCONbits.GIE = old_gie;
     
-    // 2. Poll for ACK (e.g., 0x06)
+    // 2. Poll for ACK with timeout
     uint32_t timeout = 200000;
     while(timeout-- > 0) {
         if(PIR1bits.RCIF) {
-            if(RCREG == 0x06) return 1; // ACK received
+            if(RCREG == 0x06) return 1; 
         }
     }
     return 0; // Timeout, no ACK
