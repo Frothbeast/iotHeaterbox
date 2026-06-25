@@ -546,7 +546,7 @@ void poll_uart_for_trigger() {
             rx_idx = 0;
             
             // Non-blocking ACK send
-            uint16_t timeout = 5000;
+            uint16_t timeout = 500;
             TXREG = 0x06;
             while(!TXSTAbits.TRMT && --timeout > 0); 
         }
@@ -560,7 +560,7 @@ uint8_t send_to_esp(char *data, uint8_t length) {
     // 1. Transmit packet with timeout
     for(uint8_t i = 0; i < length; i++) {
         TXREG = data[i];
-        uint16_t tx_timeout = 5000;
+        uint16_t tx_timeout = 500;
         // Wait for buffer to clear, but break if it takes too long
         while(!TXSTAbits.TRMT && --tx_timeout > 0); 
         if(tx_timeout == 0) {
@@ -571,7 +571,7 @@ uint8_t send_to_esp(char *data, uint8_t length) {
     INTCONbits.GIE = old_gie;
     
     // 2. Poll for ACK with timeout
-    uint32_t timeout = 200000;
+    uint32_t timeout = 500;
     while(timeout-- > 0) {
         if(PIR1bits.RCIF) {
             if(RCREG == 0x06) return 1; 
