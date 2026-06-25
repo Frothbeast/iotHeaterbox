@@ -434,8 +434,8 @@ void handle_buttons(void){
 
                 }
                 else {
-                    if (main_index == 0) {
-                        main_index = 5;
+                    if (main_index < 1) {
+                        main_index = 4;
                     }
                     main_index--;
 
@@ -466,7 +466,7 @@ void handle_buttons(void){
     }
 }
 
-void control_outputs(void){
+void control_output(void){
     if (select_mode && main_index == 2 && menu_state==main_menu){
         // do nothing
     }
@@ -502,6 +502,8 @@ void send_to_display(void) {
 }
 
 void main(void) {
+    
+    __delay_ms(500);//for display to powerup
   // Configuration
     ECANCON = 0x00;
     CANCON = 0x20;
@@ -556,6 +558,15 @@ void main(void) {
     sprintf(display_buffer[3], "");
 
     while(1) {
+        poll_buttons();
+        
+        handle_buttons();
+        
+        control_output();
+        
+        if(time_to_send){
+            send_to_esp();
+        }
         
         if (flag_10hz) {
             flag_10hz = 0;
@@ -578,18 +589,6 @@ void main(void) {
             }
             
             send_to_display();
-            
-            poll_buttons();
-            
-            handle_buttons();
-            
-            control_outputs();
-            
-            if(time_to_send){
-                send_to_esp();
-            }
-            
-
         }
     }
 }
