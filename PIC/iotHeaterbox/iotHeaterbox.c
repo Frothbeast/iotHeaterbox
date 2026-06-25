@@ -179,8 +179,8 @@ volatile uint16_t t_h = 0.0;
 volatile uint16_t t_b = 0.0;
 volatile uint8_t adc_ready = 0;
 volatile uint8_t isr_channel = 0;
-volatile int16_t box_setpoint = 650;
-volatile float heater_target = 0.0;
+volatile int16_t box_setpoint = 400;
+volatile int16_t heater_limit = 100;
 volatile uint16_t adc_val[2];
 volatile uint8_t flag_10hz = 0;
 volatile uint8_t wifi_ticks = 0;
@@ -222,6 +222,14 @@ char display_buffer[4][24]; // 4 lines, 20 chars + null terminator
 float Kp = 10.0, Ki = 0.5, Kd = 0.1;
 uint8_t fan_mode = 0;
 uint8_t control_active = 1;
+
+#define ESP_TX_MODE     2
+#define ESP_RX_MODE     1
+#define ESP_IDLE_MODE   0
+volatile uint8_t esp_mode = 0;
+volatile uint8_t rx_idx = 0;
+volatile uint8_t data_ready_flag = 0;
+volatile uint8_t rx_buf[13];
 
 
 void soft_putch(char data) {
@@ -310,24 +318,24 @@ float eeprom_read_f(uint8_t addr) {
 }
 
 void __interrupt() ISR(void) { 
+    // ADC handling
     if (PIR1bits.ADIF) {
         adc_val[isr_channel] = (uint16_t)((uint16_t)ADRESH << 8) | ADRESL;
         PIR1bits.ADIF = 0;
-        
         adc_ready = 1; 
-
-        // Switch channel and restart
         isr_channel = (isr_channel == 0) ? 1 : 0;
-        
         ADCON0bits.CHS = (isr_channel == 0) ? 0 : 2;
-        
         ADCON0bits.GO = 1;
     }
+    
+    // Timer 0 handling
     if (INTCONbits.TMR0IF) {
         TMR0H = 0x3C; TMR0L = 0xAF;
         flag_10hz = 1;
         INTCONbits.TMR0IF = 0;
     }
+    
+    // Timer 1 handling
     if (PIR1bits.TMR1IF) {
         static uint16_t timer1_counter = 0;
         timer1_counter++;
@@ -335,8 +343,33 @@ void __interrupt() ISR(void) {
             time_to_send = 1;
             timer1_counter = 0;
         }
-    
         PIR1bits.TMR1IF = 0;
+    }
+
+    // UART RX handling
+    if (PIR1bits.RCIF) {
+        if (RCSTAbits.OERR) { 
+            RCSTAbits.CREN = 0; 
+            RCSTAbits.CREN = 1; 
+        }
+        
+        char c = RCREG; 
+
+        // Trigger ESP_RX_MODE
+        if (c == 0x02) {
+            esp_mode = ESP_RX_MODE; // Assuming 1 = ESP_RX_MODE
+            rx_idx = 0;
+        } 
+        // Collect data only if in ESP_RX_MODE
+        else if (esp_mode == ESP_RX_MODE) {
+            if (rx_idx < 12) { 
+                rx_buf[rx_idx++] = c;
+                if (rx_idx >= 12) {
+                    esp_mode = ESP_IDLE_MODE; // Back to 
+                    data_ready_flag = 1; 
+                }
+            }
+        }
     }
 }
 
@@ -471,7 +504,7 @@ void control_output(void){
         // do nothing
     }
     else{
-        if (t_b <= box_setpoint && t_h/10 <= 100){
+        if (t_b <= box_setpoint && t_h/10 <= heater_limit){
             HEATER = 1;
         }
         else {
@@ -480,9 +513,7 @@ void control_output(void){
     }
 }
 
-void send_to_esp(void) {
-    
-}
+
 
 void send_to_display(void) {
     
@@ -501,9 +532,53 @@ void send_to_display(void) {
     INTCONbits.GIE = old_gie;// restore interrupts
 }
 
+void poll_uart_for_trigger() {
+    //Check if hardware received a byte
+    if (PIR1bits.RCIF) {
+        // Clear overrun if it happened
+        if (RCSTAbits.OERR) { 
+            RCSTAbits.CREN = 0; 
+            RCSTAbits.CREN = 1; 
+        }
+        
+        char c = RCREG;
+
+        // Check for trigger byte
+        if (c == 0x02) {
+            esp_mode = 1; // Enter ESP_RX_MODE
+            rx_idx = 0;
+            
+            // Send ACK
+            TXREG = 0x06;
+            while(!TXSTAbits.TRMT); 
+        }
+    }
+}
+
+uint8_t send_to_esp(char *data, uint8_t length) {
+    uint8_t old_gie = INTCONbits.GIE;
+    INTCONbits.GIE = 0; 
+    
+    // 1. Transmit packet
+    for(uint8_t i = 0; i < length; i++) {
+        TXREG = data[i];
+        while(!TXSTAbits.TRMT); 
+    }
+    INTCONbits.GIE = old_gie; // Re-enable interrupts
+    
+    // 2. Poll for ACK (e.g., 0x06)
+    uint32_t timeout = 200000;
+    while(timeout-- > 0) {
+        if(PIR1bits.RCIF) {
+            if(RCREG == 0x06) return 1; // ACK received
+        }
+    }
+    return 0; // Timeout, no ACK
+}
+
 void main(void) {
     
-    __delay_ms(500);//for display to powerup
+    __delay_ms(500);//for display to power up
   // Configuration
     ECANCON = 0x00;
     CANCON = 0x20;
@@ -558,6 +633,18 @@ void main(void) {
     sprintf(display_buffer[3], "");
 
     while(1) {
+        poll_uart_for_trigger();
+        
+        if (esp_mode == ESP_RX_MODE) {
+            if (PIR1bits.RCIF) {
+                rx_buf[rx_idx++] = RCREG;
+                if (rx_idx >= 12) {
+                    esp_mode = ESP_IDLE_MODE;
+                    data_ready_flag = 1;
+                }
+            }
+        }
+        
         poll_buttons();
         
         handle_buttons();
@@ -565,7 +652,25 @@ void main(void) {
         control_output();
         
         if(time_to_send){
-            send_to_esp();
+            time_to_send=0;
+            uint8_t raw_buffer[9];
+            char ascii_hex_packet[18];
+            memcpy(&raw_buffer[0], &t_h, 2);
+            memcpy(&raw_buffer[2], &t_b, 2);
+            raw_buffer[4] = FAN;
+            raw_buffer[5] = LIGHT;
+            raw_buffer[6] = HEATER;
+            memcpy(&raw_buffer[7], &box_setpoint, 2);
+            const char hex_chars[] = "0123456789ABCDEF";
+            for(uint8_t i = 0; i < 9; i++) {
+                ascii_hex_packet[i * 2]     = hex_chars[(raw_buffer[i] >> 4) & 0x0F];
+                ascii_hex_packet[i * 2 + 1] = hex_chars[raw_buffer[i] & 0x0F];
+            }
+            if (send_to_esp(ascii_hex_packet, 18)) {
+                // Successfully sent and acknowledged
+            } else {
+                // Handle error (e.g., retry or log)
+            }
         }
         
         if (flag_10hz) {
