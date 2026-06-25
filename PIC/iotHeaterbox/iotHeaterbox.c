@@ -59,10 +59,8 @@ volatile uint8_t btn_menu_state = 0, btn_up_state = 0, btn_down_state = 0, btn_s
 #define being_held  3
 
 #define main_menu 0
-#define setpoint_menu 2
-#define wifi_menu 3
-#define manual_menu 1
-#define pid_menu 4
+#define wifi_menu 1
+#define pid_menu 2
 
 volatile uint8_t *btn_pins[] = {&btn_menu, &btn_up, &btn_down, &btn_select};
 volatile uint8_t *btn_states[] = {&btn_menu_state, &btn_up_state, &btn_down_state, &btn_select_state};
@@ -214,20 +212,9 @@ void handle_buttons(void){
                 sprintf(display_buffer[0], "Main Menu");
                 sprintf(display_buffer[1], "H:%5.1f B:%5.1f", t_h, t_b);
                 sprintf(display_buffer[2], "F:%d L:%d H:%d", FAN, LIGHT, HEATER);
-
-                break;
-            case setpoint_menu:
-                sprintf(display_buffer[0], "Setpoint Menu");
-                sprintf(display_buffer[1], "H:%5.1f B:%5.1f", t_h, t_b);
-                sprintf(display_buffer[2], "F:%d L:%d H:%d", FAN, LIGHT, HEATER);
                 break;
             case wifi_menu:
                 sprintf(display_buffer[0], "WIFI Menu");
-                sprintf(display_buffer[1], "H:%5.1f B:%5.1f", t_h, t_b);
-                sprintf(display_buffer[2], "F:%d L:%d H:%d", FAN, LIGHT, HEATER);
-                break;
-            case manual_menu:
-                sprintf(display_buffer[0], "Manual Menu");
                 sprintf(display_buffer[1], "H:%5.1f B:%5.1f", t_h, t_b);
                 sprintf(display_buffer[2], "F:%d L:%d H:%d", FAN, LIGHT, HEATER);
                 break;
@@ -361,8 +348,11 @@ void main(void) {
                     t_b = calc_celsius(adc_val[1], 50300.0, 0);
                 }
             }
-            sprintf(display_buffer[1], "H:%5.1f B:%5.1f", t_h, t_b);
-            sprintf(display_buffer[2], "F:%d L:%d H:%d SP:%3d", FAN, LIGHT, HEATER, box_setpoint);
+            
+            if (menu_state == main_menu){
+                sprintf(display_buffer[1], "H:%5.1f B:%5.1f", t_h, t_b);
+                sprintf(display_buffer[2], "F:%d L:%d H:%d SP:%3d", FAN, LIGHT, HEATER, box_setpoint);
+            }
             
             send_to_display();
             
