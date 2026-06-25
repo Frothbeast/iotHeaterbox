@@ -48,21 +48,14 @@ const HeaterSidebar = ({ isOpen, records, selectedHours }) => {
           <HeaterChart
             labels={labels}
             datasets={[
+              { label: "Setpoint", color: "white", data: records.map(r => r.setpoint) },
               { label: "Box °C", color: "red", data: records.map(r => r.tempBox) },
               { label: "Heater °C", color: "pink", data: records.map(r => r.tempHeater) }
             ]}
             options={config}
           />
         </div>
-        <div className="chartContainer">
-          <HeaterChart
-            labels={labels}
-            datasets={[
-              { label: "Status Bits", color: "yellow", data: records.map(r => r.statusBits) }
-            ]}
-            options={config}
-          />
-        </div>
+
         <div className="chartContainer">
           <HeaterChart
             labels={labels}

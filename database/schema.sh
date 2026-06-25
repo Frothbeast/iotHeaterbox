@@ -14,10 +14,11 @@ mysql -u root -p"${MYSQL_ROOT_PASSWORD}" <<-EOSQL
         \`datetime\` DATETIME NOT NULL,
         \`tempBox\` DECIMAL(5, 2) DEFAULT NULL,
         \`tempHeater\` DECIMAL(5, 2) DEFAULT NULL,
-        \`rssiAvg\` INT DEFAULT NULL,
-        \`statusBits\` INT DEFAULT NULL,
-        \`readingCount\` INT DEFAULT 0,
-        \`notes\` TEXT,
+        \`fan\` INT DEFAULT NULL,
+        \`light\` INT DEFAULT NULL,
+        \`heater\` INT DEFAULT NULL,
+        \`setpoint\` DECIMAL(5, 2) DEFAULT NULL,
+        \`RSSI\` INT DEFAULT NULL,
         PRIMARY KEY (\`id\`),
         INDEX \`idx_esp_time\` (\`id\`, \`datetime\`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

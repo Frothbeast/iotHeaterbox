@@ -58,10 +58,11 @@ def bootstrap_db():
             datetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             tempBox DECIMAL(5,2),
             tempHeater DECIMAL(5,2),
-            statusBits INT,
-            rssiAvg INT,
-            readingCount INT,
-            notes VARCHAR(50)
+            fan INT,
+            light INT,
+            heater INT,
+            setpoint DECIMAL(5,2),
+            rssi INT       
         )
     """)
     conn.commit()
@@ -82,7 +83,7 @@ def get_data():
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
         query = """
-            SELECT datetime, id, tempBox, tempHeater, statusBits, rssiAvg, readingCount, notes 
+            SELECT datetime, tempBox, tempHeater, fan, light, heater, setpoint, rssi 
             FROM heaterData 
             WHERE datetime > NOW() - INTERVAL %s HOUR 
             ORDER BY datetime DESC;
@@ -98,50 +99,50 @@ def get_data():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route('/api/cl1p', methods=['POST'])
-def handle_cl1p_sync():
-    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-    headers = {"Content-Type": "text/plain", "cl1papitoken": CL1P_TOKEN}
+# @app.route('/api/cl1p', methods=['POST'])
+# def handle_cl1p_sync():
+#     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+#     headers = {"Content-Type": "text/plain", "cl1papitoken": CL1P_TOKEN}
 
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor(dictionary=True)
+#     try:
+#         conn = get_db_connection()
+#         cursor = conn.cursor(dictionary=True)
         
-        if LOCATION == "home":
-            query = "SELECT * FROM heaterData WHERE datetime >= NOW() - INTERVAL 7 DAY"
-            cursor.execute(query)
-            rows = cursor.fetchall()
+#         if LOCATION == "home":
+#             query = "SELECT * FROM heaterData WHERE datetime >= NOW() - INTERVAL 7 DAY"
+#             cursor.execute(query)
+#             rows = cursor.fetchall()
             
-            processed = []
-            for row in rows:
-                row['datetime'] = row['datetime'].strftime('%Y-%m-%d %H:%M:%S')
-                if isinstance(row['tempBox'], Decimal): row['tempBox'] = float(row['tempBox'])
-                if isinstance(row['tempHeater'], Decimal): row['tempHeater'] = float(row['tempHeater'])
-                processed.append(row)
+#             processed = []
+#             for row in rows:
+#                 row['datetime'] = row['datetime'].strftime('%Y-%m-%d %H:%M:%S')
+#                 if isinstance(row['tempBox'], Decimal): row['tempBox'] = float(row['tempBox'])
+#                 if isinstance(row['tempHeater'], Decimal): row['tempHeater'] = float(row['tempHeater'])
+#                 processed.append(row)
 
-            requests.post(CL1P_URL, data=json.dumps(processed), headers=headers, verify=False)
-            return jsonify({"status": "pushed", "count": len(processed)})
+#             requests.post(CL1P_URL, data=json.dumps(processed), headers=headers, verify=False)
+#             return jsonify({"status": "pushed", "count": len(processed)})
 
-        elif LOCATION == "work":
-            response = requests.get(CL1P_URL, headers=headers, verify=False)
-            if response.status_code == 200:
-                items = json.loads(response.text)
-                added = 0
-                for item in items:
-                    cursor.execute("SELECT id FROM heaterData WHERE datetime = %s", (item['datetime'],))
-                    if not cursor.fetchone():
-                        iq = """INSERT INTO heaterData (datetime, tempBox, tempHeater, statusBits, rssiAvg, readingCount) 
-                                VALUES (%s, %s, %s, %s, %s, %s)"""
-                        cursor.execute(iq, (item['datetime'], item['tempBox'], item['tempHeater'], 
-                                           item['statusBits'], item['rssiAvg'], item['readingCount']))
-                        added += 1
-                conn.commit()
-                return jsonify({"status": "pulled", "added": added})
+#         elif LOCATION == "work":
+#             response = requests.get(CL1P_URL, headers=headers, verify=False)
+#             if response.status_code == 200:
+#                 items = json.loads(response.text)
+#                 added = 0
+#                 for item in items:
+#                     cursor.execute("SELECT id FROM heaterData WHERE datetime = %s", (item['datetime'],))
+#                     if not cursor.fetchone():
+#                         iq = """INSERT INTO heaterData (datetime, tempBox, tempHeater, statusBits, rssiAvg, readingCount) 
+#                                 VALUES (%s, %s, %s, %s, %s, %s)"""
+#                         cursor.execute(iq, (item['datetime'], item['tempBox'], item['tempHeater'], 
+#                                            item['statusBits'], item['rssiAvg'], item['readingCount']))
+#                         added += 1
+#                 conn.commit()
+#                 return jsonify({"status": "pulled", "added": added})
                 
-        cursor.close()
-        conn.close()
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+#         cursor.close()
+#         conn.close()
+#     except Exception as e:
+#         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/time', methods=['GET'])
 def get_time():

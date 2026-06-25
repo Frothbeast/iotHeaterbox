@@ -12,7 +12,7 @@ export function useHeaterData(hours) {
                 .then(res => res.json())
                 .then(data => {
                     if (Array.isArray(data)) {
-                        setHeaterRecords(data); // Fields: datetime, tempBox, tempHeater, statusBits, rssiAvg, readingCount
+                        setHeaterRecords(data); //
                     }
                     setIsLoading(false);
                 })

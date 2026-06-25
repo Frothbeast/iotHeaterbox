@@ -27,7 +27,7 @@ const ControlBar = ({ cl1pClick, selectedHours, onHoursChange, columnStats, reco
         <div className="lastRun">
           <span className="label">Last Reading</span>
           <span className="value">{columnStats?.lastTime ?? "N/a"}</span>
-          <span className="unit">{columnStats?.lastStatus ? `Status: ${columnStats.lastStatus}` : ""}</span>
+          <span className="unit">{columnStats?.lastHeater? `Heater: ${columnStats.lastHeater}` : ""}</span>
         </div>
         <div className="lastTemp">
           <span className="label">Box Temp</span>
@@ -59,6 +59,7 @@ const ControlBar = ({ cl1pClick, selectedHours, onHoursChange, columnStats, reco
           <HeaterChart
             labels={records.map((_, i) => i)}
             datasets={[
+              { label: "Setpoint", color: "white", data: records.map(r => r.setpoint) },
               { label: "Box", color: "red", data: records.map(r => r.tempBox) },
               { label: "Heater", color: "pink", data: records.map(r => r.tempHeater) }
             ]}
@@ -66,21 +67,11 @@ const ControlBar = ({ cl1pClick, selectedHours, onHoursChange, columnStats, reco
           />
         </div>
         <div className="chartContainer">
-          <div className="chartWatermark">STAT</div>
-          <HeaterChart
-            labels={records.map((_, i) => i)}
-            datasets={[
-              { label: "Status", color: "yellow", data: records.map(r => r.statusBits) }
-            ]}
-            options={getOptions(0, 15)}
-          />
-        </div>
-        <div className="chartContainer">
           <div className="chartWatermark">RSSI</div>
           <HeaterChart
             labels={records.map((_, i) => i)}
             datasets={[
-              { label: "RSSI %", color: "cyan", data: records.map(r => r.rssiAvg) }
+              { label: "RSSI", color: "cyan", data: records.map(r => r.rssi) }
             ]}
             options={getOptions(0, 100)}
           />
