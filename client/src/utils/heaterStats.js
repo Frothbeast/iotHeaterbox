@@ -19,6 +19,6 @@ export const calculateColumnStats = (heaterRecords) => {
     lastBoxTemp: lastRecord.tempBox,
     lastHeaterTemp: lastRecord.tempHeater,
     lastHeater: lastRecord.heater,
-    lastRSSI: lastRecord.rssiAvg
+    lastRSSI: lastRecord.rssi
   };
 };

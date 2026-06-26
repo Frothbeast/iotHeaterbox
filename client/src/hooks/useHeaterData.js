@@ -8,7 +8,7 @@ export function useHeaterData(hours) {
         let interval;
 
         const fetchData = () => {
-            fetch(`${process.env.REACT_APP_HEATER_API_URL}/api/heaterData?hours=${hours}`)
+            fetch(`${process.env.REACT_APP_HEATERBOX_API_URL}/api/heaterData?hours=${hours}`)
                 .then(res => res.json())
                 .then(data => {
                     if (Array.isArray(data)) {

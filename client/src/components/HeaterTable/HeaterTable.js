@@ -26,7 +26,7 @@ const HeaterTable = ({ records = [], columnStats }) => {
                             <td className="heaterTableCell">{record.setpoint}</td>
                             <td className="heaterTableCell">{record.tempBox}</td>
                             <td className="heaterTableCell">{record.tempHeater}</td>
-                            <td className="heaterTableCell">F:{record.fan} L:{record.light} H:{record.Heater}</td>
+                            <td className="heaterTableCell">F:{record.fan} L:{record.light} H:{record.heater}</td>
                             <td className="heaterTableCell">{record.rssi}</td>
                         </tr>
                     ))}
