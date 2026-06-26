@@ -346,27 +346,20 @@ void __interrupt() ISR(void) {
         PIR1bits.TMR1IF = 0;
     }
 
-    // UART RX handling
     if (PIR1bits.RCIF) {
-        if (RCSTAbits.OERR) { 
-            RCSTAbits.CREN = 0; 
-            RCSTAbits.CREN = 1; 
-        }
+        if (RCSTAbits.OERR) { RCSTAbits.CREN = 0; RCSTAbits.CREN = 1; }
         
-        char c = RCREG; 
-
-        // Trigger ESP_RX_MODE
+        char c = RCREG;
+        
         if (c == 0x02) {
-            esp_mode = ESP_RX_MODE; // Assuming 1 = ESP_RX_MODE
+            esp_mode = ESP_RX_MODE;
             rx_idx = 0;
-        } 
-        // Collect data only if in ESP_RX_MODE
-        else if (esp_mode == ESP_RX_MODE) {
-            if (rx_idx < 12) { 
+        } else if (esp_mode == ESP_RX_MODE) {
+            if (rx_idx < 12) {
                 rx_buf[rx_idx++] = c;
                 if (rx_idx >= 12) {
-                    esp_mode = ESP_IDLE_MODE; // Back to 
-                    data_ready_flag = 1; 
+                    esp_mode = ESP_IDLE_MODE;
+                    time_to_send = 1; 
                 }
             }
         }
@@ -560,7 +553,7 @@ uint8_t send_to_esp(char *data, uint8_t length) {
     // 1. Transmit packet with timeout
     for(uint8_t i = 0; i < length; i++) {
         TXREG = data[i];
-        uint16_t tx_timeout = 500;
+        uint16_t tx_timeout = 1000;
         // Wait for buffer to clear, but break if it takes too long
         while(!TXSTAbits.TRMT && --tx_timeout > 0); 
         if(tx_timeout == 0) {
@@ -571,7 +564,7 @@ uint8_t send_to_esp(char *data, uint8_t length) {
     INTCONbits.GIE = old_gie;
     
     // 2. Poll for ACK with timeout
-    uint32_t timeout = 500;
+    uint32_t timeout = 1000;
     while(timeout-- > 0) {
         if(PIR1bits.RCIF) {
             if(RCREG == 0x06) return 1; 
@@ -623,7 +616,7 @@ void main(void) {
           // Splash screen (standard delay allowed here as no other tasks are running)
     __delay_ms(2000);
     lcd_cmd_direct(LCD_CLR);
-
+    PIE1bits.RCIE = 1; // Enable UART Receive Interrupt
     // Start interrupts for main loop
     T0CON = 0x84; INTCONbits.TMR0IE = 1; PIE1bits.ADIE = 1; INTCONbits.GIE = 1; INTCONbits.PEIE = 1;
     T1CON = 0x30; TMR1H = 0; TMR1L = 0; PIE1bits.TMR1IE = 1; T1CONbits.TMR1ON = 1;
@@ -637,17 +630,6 @@ void main(void) {
     sprintf(display_buffer[3], "");
 
     while(1) {
-        poll_uart_for_trigger();
-        
-        if (esp_mode == ESP_RX_MODE) {
-            if (PIR1bits.RCIF) {
-                rx_buf[rx_idx++] = RCREG;
-                if (rx_idx >= 12) {
-                    esp_mode = ESP_IDLE_MODE;
-                    data_ready_flag = 1;
-                }
-            }
-        }
         
         poll_buttons();
         
@@ -657,6 +639,10 @@ void main(void) {
         
         if(time_to_send){
             time_to_send=0;
+            sprintf(display_buffer[3], "Sending to ESP");
+            lcd_move_cursor(lcd_line_addrs[3]);
+            lcd_write(display_buffer[3]);
+            
             uint8_t raw_buffer[9];
             char ascii_hex_packet[18];
             memcpy(&raw_buffer[0], &t_h, 2);
@@ -671,10 +657,13 @@ void main(void) {
                 ascii_hex_packet[i * 2 + 1] = hex_chars[raw_buffer[i] & 0x0F];
             }
             if (send_to_esp(ascii_hex_packet, 18)) {
-                // Successfully sent and acknowledged
+                sprintf(display_buffer[3], "ESP SUCCESS        ");
+
             } else {
-                // Handle error (e.g., retry or log)
-            }
+                sprintf(display_buffer[3], "ESP FAIL           ");
+            } 
+            lcd_move_cursor(lcd_line_addrs[3]);
+            lcd_write(display_buffer[3]);
         }
         
         if (flag_10hz) {
