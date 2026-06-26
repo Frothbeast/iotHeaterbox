@@ -66,7 +66,7 @@
 .heaterTableCell,
 .heaterTableCell1,
 .heaterTableCell2 {
-  width: 14.28% !important;
+  width: 20% !important;
   text-align: center;
   padding: 8px 0;
 }
@@ -123,7 +123,7 @@
 
 }
 
-.heaterTableCell2 {
+.heaterTableCell2 .heaterTableCell {
     font-size: var(--heaterTable__header-smallFont);
 }
 

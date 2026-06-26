@@ -152,8 +152,8 @@ volatile uint16_t esp_timeout_counter = 0;
 volatile uint8_t esp_active = 1; // 1 = Attempt communication, 0 = Skip communication
 
 #define HEATER LATCbits.LATC3
-#define FAN    LATCbits.LATC2
-#define LIGHT  LATCbits.LATC1
+#define FAN    LATCbits.LATC1
+#define LIGHT  LATCbits.LATC2
 #define DISP_TX LATBbits.LATB4
 
 #define LCD_ON_CURSOR_BLINK 25

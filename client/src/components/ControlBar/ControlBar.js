@@ -48,7 +48,6 @@ const ControlBar = ({ cl1pClick, selectedHours, onHoursChange, columnStats, reco
             <option value={1}>1 Hour</option>
             <option value={8}>8 Hour</option>
             <option value={24}>24 Hour</option>
-            <option value={168}>168 Hour</option>
           </select>
         </div>
       </div>
@@ -63,7 +62,7 @@ const ControlBar = ({ cl1pClick, selectedHours, onHoursChange, columnStats, reco
               { label: "Box", color: "red", data: records.map(r => r.tempBox) },
               { label: "Heater", color: "pink", data: records.map(r => r.tempHeater) }
             ]}
-            options={getOptions(-10, 100)}
+            options={getOptions(-10, 150)}
           />
         </div>
         <div className="chartContainer">

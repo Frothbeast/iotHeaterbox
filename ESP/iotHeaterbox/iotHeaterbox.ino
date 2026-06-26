@@ -29,7 +29,7 @@ void byteToHex(uint8_t val, char* buf) {
 }
 
 void loop() {
-  static char rx_buffer[19];
+  static char rx_buffer[21];
   static int index = 0;
   static bool receiving = false;
 
@@ -50,19 +50,18 @@ void loop() {
         Serial.write(0x06);
         
         // Network task
-       if (WiFi.status() == WL_CONNECTED) {
+        if (WiFi.status() == WL_CONNECTED) {
           if (client.connect(SERVER_IP, SERVER_PORT)) {
-            // Send the 18-byte buffer
-            client.print(rx_buffer);
-            
-            // Get RSSI (it is negative, cast to absolute uint8_t for hex)
+            // Calculate and append RSSI to the buffer itself
             int rssi = abs(WiFi.RSSI());
-            char rssi_hex[2];
-            byteToHex((uint8_t)rssi, rssi_hex);
+            byteToHex((uint8_t)rssi, &rx_buffer[18]); 
+            rx_buffer[20] = '\0'; // Ensure termination
             
-            // Send the 2-char hex RSSI
-            client.write(rssi_hex, 2);
+            // Send the complete 20-byte payload
+            client.write((uint8_t*)rx_buffer, 20);
             
+            // Wait briefly for the server to acknowledge
+            delay(100); 
             client.stop();
           }
         }

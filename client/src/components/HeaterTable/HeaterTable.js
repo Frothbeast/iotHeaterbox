@@ -14,7 +14,7 @@ const HeaterTable = ({ records = [], columnStats }) => {
                         <th className="heaterTableHeaderCellRow1 smaller">Box °C</th>
                         <th className="heaterTableHeaderCellRow1 smaller">Heater °C</th>
                         <th className="heaterTableHeaderCellRow1 smaller">Status</th>
-                        <th className="heaterTableHeaderCellRow1 smaller">RSSI %</th>
+                        <th className="heaterTableHeaderCellRow1 smaller">RSSI</th>
                     </tr>
                 </thead>
                 <tbody className="heaterTableBody">

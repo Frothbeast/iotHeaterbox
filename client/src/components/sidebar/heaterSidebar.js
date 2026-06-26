@@ -60,7 +60,7 @@ const HeaterSidebar = ({ isOpen, records, selectedHours }) => {
           <HeaterChart
             labels={labels}
             datasets={[
-              { label: "RSSI %", color: "cyan", data: records.map(r => r.rssiAvg) }
+              { label: "RSSI", color: "cyan", data: records.map(r => r.rssi) }
             ]}
             options={config}
           />
