@@ -42,6 +42,7 @@ void loop() {
           rx_buffer[i++] = Serial.read();
         }
       }
+      client.print("DEBUG: ACK_READY");
       // ACK now
       Serial.write(0x06);
       if (i == 18) {
@@ -50,7 +51,7 @@ void loop() {
         rx_buffer[20] = '\0'; 
         data_ready = true;
       }
-  
+      client.print(rx_buffer);
       
     }
   }
