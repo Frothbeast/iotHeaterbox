@@ -547,32 +547,13 @@ uint8_t send_to_esp(char *data, uint8_t length) {
     for(uint8_t i = 0; i < length; i++) {
         uint16_t timeout = 50000; // Increased for reliable detection
         TXREG = data[i];
-        
-        // Wait for buffer ready (TXIF)
-        while(!PIR1bits.TXIF && --timeout > 0);
-        
-        // If timeout reaches 0, the hardware is unresponsive (ESP missing/grounded)
-        if(timeout == 0) {
-            esp_mode = ESP_IDLE_MODE;
-            TXSTAbits.TXEN = 0; // Disable TX
-            TXSTAbits.TXEN = 1; // Re-enable to clear the internal buffer
-            return 0; // Trigger the "ESP FAIL" condition
-        }
+        while(!PIR1bits.TXIF);
     }
     
-    // Final wait for last byte to physically leave the chip
-    uint16_t timeout = 50000;
-    while(!TXSTAbits.TRMT && --timeout > 0);
-    if(timeout == 0) return 0;
+    uint32_t wait_counter = 100000; 
+    while(!ack_received && --wait_counter > 0);
 
-    // Wait for ACK flag set by ISR
-    timeout = 50000; 
-    while(!ack_received && --timeout > 0);
-
-    if (ack_received) {
-        return 1; // ACK received
-    }
-    return 0; // Timeout
+    return (ack_received == 1);
 }
 
 uint8_t wait_for_handshake(uint8_t send_byte) {
@@ -606,14 +587,23 @@ uint8_t wait_for_handshake(uint8_t send_byte) {
 }
 
 void main(void) {
-    // 20MHz Clock, 9600 Baud @ BRGH=1
-    TXSTAbits.BRGH = 1;     // High Speed mode
-    TXSTAbits.SYNC = 0;     // Asynchronous mode
-    BAUDCONbits.BRG16 = 0;  // 8-bit mode
-    SPBRG = 129;            // (20,000,000 / (16 * 9600)) - 1 = 129
-    RCSTAbits.SPEN = 1;     // Enable Serial Port
-    TXSTAbits.TXEN = 1;     // Enable Transmitter
-    RCSTAbits.CREN = 1;     // Enable Receiver
+    // 20MHz Clock, 115200 Baud @ BRGH=1, BRG16=1
+    TXSTAbits.BRGH = 1;       // High Speed mode
+    TXSTAbits.SYNC = 0;       // Asynchronous
+    BAUDCONbits.BRG16 = 1;    // 16-bit mode enabled
+    SPBRG = 42;               // Lower 8 bits
+    SPBRGH = 0;               // Upper 8 bits
+    RCSTAbits.SPEN = 1;       // Enable Serial Port
+    TXSTAbits.TXEN = 1;       // Enable Transmitter
+    RCSTAbits.CREN = 1;       // Enable Receiver
+    // 20MHz Clock, 115200 Baud @ BRGH=1
+    //TXSTAbits.BRGH = 1;       // High Speed mode
+    //TXSTAbits.SYNC = 0;       // Asynchronous
+    //BAUDCONbits.BRG16 = 0;    // 8-bit mode
+    //SPBRG = 10;               // Rounded from 9.85
+    //RCSTAbits.SPEN = 1;       // Enable Serial Port
+    //TXSTAbits.TXEN = 1;       // Enable Transmitter
+    //RCSTAbits.CREN = 1;       // Enable Receiver
     __delay_ms(500);//for display to power up
   // Configuration
     ECANCON = 0x00;
@@ -706,47 +696,30 @@ void main(void) {
         
         if (esp_mode == ESP_IDLE_MODE) {
             static uint8_t retry_count = 0;
-            if(time_to_send){
-                time_to_send=0;
-                if (esp_active){
-                    sprintf(display_buffer[3], "Sending to ESP");
-                    lcd_move_cursor(lcd_line_addrs[3]);
-                    lcd_write(display_buffer[3]);
+            if (time_to_send) {
+                time_to_send = 0;
 
-                    uint8_t raw_buffer[9];
-                    char ascii_hex_packet[18];
-                    memcpy(&raw_buffer[0], &t_h, 2);
-                    memcpy(&raw_buffer[2], &t_b, 2);
-                    raw_buffer[4] = FAN;
-                    raw_buffer[5] = LIGHT;
-                    raw_buffer[6] = HEATER;
-                    memcpy(&raw_buffer[7], &box_setpoint, 2);
-                    const char hex_chars[] = "0123456789ABCDEF";
-                    for(uint8_t i = 0; i < 9; i++) {
-                        ascii_hex_packet[i * 2]     = hex_chars[(raw_buffer[i] >> 4) & 0x0F];
-                        ascii_hex_packet[i * 2 + 1] = hex_chars[raw_buffer[i] & 0x0F];
-                    }
-                    if (send_to_esp(ascii_hex_packet, 18)) {
+                if (esp_active) {
+                    char packet_buffer[24];
+                    //sprintf(packet_buffer, "%04X%04X%02X%02X%02X%04X", t_h, t_b, FAN, LIGHT, HEATER, box_setpoint);
+                    sprintf(packet_buffer, "123456789ABCDEF678");
+                    if (send_to_esp(packet_buffer, 18)) {
                         sprintf(display_buffer[3], "ESP SUCCESS        ");
                         retry_count = 0;
                     } else {
                         retry_count++;
-                        if (retry_count > 3) {
-                            sprintf(display_buffer[3], "NO ESP DETECTED");
-                        } else {
-                            sprintf(display_buffer[3], "ESP FAIL");
-                        }
-                    } 
-                    lcd_move_cursor(lcd_line_addrs[3]);
-                    lcd_write(display_buffer[3]);
-                }
+                        sprintf(display_buffer[3], "ESP FAIL (%d)      ", retry_count);
+                    }
+                } 
                 else {
-                // Keep the error message static
-                sprintf(display_buffer[3], "NO ESP DETECTED");
+                    // This is what you were missing: 
+                    // Logic to handle when the ESP is not active
+                    sprintf(display_buffer[3], "NO ESP DETECTED    ");
+                }
+
                 lcd_move_cursor(lcd_line_addrs[3]);
                 lcd_write(display_buffer[3]);
-                }
-            }
+}
 
             if (flag_10hz) {
                 flag_10hz = 0;
@@ -763,6 +736,7 @@ void main(void) {
                 }
 
                 if (menu_state == main_menu){
+                    sprintf(display_buffer[0], "%04X%04X%02X%02X%02X%04X", t_h, t_b, FAN, LIGHT, HEATER, box_setpoint);
                     sprintf(display_buffer[1], "H:%3d.%1d B:%3d.%1d", t_h / 10, t_h % 10, t_b / 10, t_b % 10);
                     sprintf(display_buffer[2], "F:%d L:%d H:%d S:%3d.%1d", FAN, LIGHT, HEATER, box_setpoint / 10, box_setpoint % 10);
 
