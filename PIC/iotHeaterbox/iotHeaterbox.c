@@ -183,7 +183,7 @@ volatile uint16_t t_b = 0.0;
 volatile uint8_t adc_ready = 0;
 volatile uint8_t isr_channel = 0;
 volatile int16_t box_setpoint = 400;
-volatile int16_t heater_limit = 100;
+volatile int16_t heater_limit = 150;
 volatile uint16_t adc_val[2];
 volatile uint8_t flag_10hz = 0;
 volatile uint8_t wifi_ticks = 0;
