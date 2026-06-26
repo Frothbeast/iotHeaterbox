@@ -548,6 +548,7 @@ uint8_t send_to_esp(char *data, uint8_t length) {
         uint16_t timeout = 50000; // Increased for reliable detection
         TXREG = data[i];
         while(!PIR1bits.TXIF);
+        __delay_ms(2);
     }
     
     uint32_t wait_counter = 100000; 
@@ -587,23 +588,14 @@ uint8_t wait_for_handshake(uint8_t send_byte) {
 }
 
 void main(void) {
-    // 20MHz Clock, 115200 Baud @ BRGH=1, BRG16=1
+    // 20MHz Clock, 9600 Baud @ BRGH=1
     TXSTAbits.BRGH = 1;       // High Speed mode
     TXSTAbits.SYNC = 0;       // Asynchronous
-    BAUDCONbits.BRG16 = 1;    // 16-bit mode enabled
-    SPBRG = 42;               // Lower 8 bits
-    SPBRGH = 0;               // Upper 8 bits
+    BAUDCONbits.BRG16 = 0;    // 8-bit mode
+    SPBRG = 129;              // (20,000,000 / (16 * 9600)) - 1 = 129
     RCSTAbits.SPEN = 1;       // Enable Serial Port
     TXSTAbits.TXEN = 1;       // Enable Transmitter
     RCSTAbits.CREN = 1;       // Enable Receiver
-    // 20MHz Clock, 115200 Baud @ BRGH=1
-    //TXSTAbits.BRGH = 1;       // High Speed mode
-    //TXSTAbits.SYNC = 0;       // Asynchronous
-    //BAUDCONbits.BRG16 = 0;    // 8-bit mode
-    //SPBRG = 10;               // Rounded from 9.85
-    //RCSTAbits.SPEN = 1;       // Enable Serial Port
-    //TXSTAbits.TXEN = 1;       // Enable Transmitter
-    //RCSTAbits.CREN = 1;       // Enable Receiver
     __delay_ms(500);//for display to power up
   // Configuration
     ECANCON = 0x00;
@@ -701,8 +693,8 @@ void main(void) {
 
                 if (esp_active) {
                     char packet_buffer[24];
-                    //sprintf(packet_buffer, "%04X%04X%02X%02X%02X%04X", t_h, t_b, FAN, LIGHT, HEATER, box_setpoint);
-                    sprintf(packet_buffer, "123456789ABCDEF678");
+                    sprintf(packet_buffer, "%04X%04X%02X%02X%02X%04X", t_h, t_b, FAN, LIGHT, HEATER, box_setpoint);
+                    
                     if (send_to_esp(packet_buffer, 18)) {
                         sprintf(display_buffer[3], "ESP SUCCESS        ");
                         retry_count = 0;
@@ -736,7 +728,7 @@ void main(void) {
                 }
 
                 if (menu_state == main_menu){
-                    sprintf(display_buffer[0], "%04X%04X%02X%02X%02X%04X", t_h, t_b, FAN, LIGHT, HEATER, box_setpoint);
+                    //sprintf(display_buffer[0], "%04X%04X%02X%02X%02X%04X", t_h, t_b, FAN, LIGHT, HEATER, box_setpoint);
                     sprintf(display_buffer[1], "H:%3d.%1d B:%3d.%1d", t_h / 10, t_h % 10, t_b / 10, t_b % 10);
                     sprintf(display_buffer[2], "F:%d L:%d H:%d S:%3d.%1d", FAN, LIGHT, HEATER, box_setpoint / 10, box_setpoint % 10);
 

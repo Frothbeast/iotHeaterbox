@@ -8,7 +8,7 @@ char rx_buffer[21]; // Buffer for 18 chars + RSSI + terminator
 bool data_ready = false;
 
 void setup() {
-  Serial.begin(115200); 
+   Serial.begin(9600, SERIAL_8N1); 
 
   while(!Serial.available());
   if (Serial.read() == 0xAA) {
@@ -29,25 +29,42 @@ void byteToHex(uint8_t val, char* buf) {
 }
 
 void loop() {
-  if (Serial.available()) {
-    if (Serial.read() == 0x02) {
-      char rx_buffer[19]; 
+  static char rx_buffer[19];
+  static int index = 0;
+  static bool receiving = false;
+
+  while (Serial.available() > 0) {
+    char c = Serial.read();
+
+    if (c == 0x02) { // Start bit
+      index = 0;
+      receiving = true;
+    } 
+    else if (receiving) {
+      rx_buffer[index++] = c;
       
-      // REPLACE THE OLD WHILE LOOP WITH THIS FOR LOOP
-      for (int i = 0; i < 18; i++) {
-        while (!Serial.available()); // Wait until the byte arrives
-        rx_buffer[i] = Serial.read();
-      }
-      rx_buffer[18] = '\0'; // Ensure it's null-terminated
-      
-      // ACK immediately after buffer is filled
-      Serial.write(0x06); 
-      
-      // Perform network operations
-      if (WiFi.status() == WL_CONNECTED) {
-        if (client.connect(SERVER_IP, SERVER_PORT)) {
-          client.print(rx_buffer); 
-          client.stop();
+      if (index >= 18) { // Buffer full
+        rx_buffer[18] = '\0';
+        receiving = false;
+
+        Serial.write(0x06);
+        
+        // Network task
+       if (WiFi.status() == WL_CONNECTED) {
+          if (client.connect(SERVER_IP, SERVER_PORT)) {
+            // Send the 18-byte buffer
+            client.print(rx_buffer);
+            
+            // Get RSSI (it is negative, cast to absolute uint8_t for hex)
+            int rssi = abs(WiFi.RSSI());
+            char rssi_hex[2];
+            byteToHex((uint8_t)rssi, rssi_hex);
+            
+            // Send the 2-char hex RSSI
+            client.write(rssi_hex, 2);
+            
+            client.stop();
+          }
         }
       }
     }
