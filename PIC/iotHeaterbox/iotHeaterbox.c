@@ -148,6 +148,9 @@ const int16_t box_temp_lut[1024] = {
 
 #define _XTAL_FREQ 20000000
 
+volatile uint16_t esp_timeout_counter = 0;
+volatile uint8_t esp_active = 1; // 1 = Attempt communication, 0 = Skip communication
+
 #define HEATER LATCbits.LATC3
 #define FAN    LATCbits.LATC2
 #define LIGHT  LATCbits.LATC1
@@ -358,8 +361,7 @@ void __interrupt() ISR(void) {
             if (rx_idx < 12) {
                 rx_buf[rx_idx++] = c;
                 if (rx_idx >= 12) {
-                    esp_mode = ESP_IDLE_MODE;
-                    time_to_send = 1; 
+                    esp_mode = ESP_IDLE_MODE; 
                 }
             }
         }
@@ -506,8 +508,6 @@ void control_output(void){
     }
 }
 
-
-
 void send_to_display(void) {
     
     uint8_t old_gie = INTCONbits.GIE; //save state of interrupts
@@ -525,56 +525,69 @@ void send_to_display(void) {
     INTCONbits.GIE = old_gie;// restore interrupts
 }
 
-void poll_uart_for_trigger() {
-    if (PIR1bits.RCIF) {
-        if (RCSTAbits.OERR) { 
-            RCSTAbits.CREN = 0; 
-            RCSTAbits.CREN = 1; 
-        }
-        
-        char c = RCREG;
+uint8_t send_to_esp(char *data, uint8_t length) {
+    // 1. Check for UART error (Overrun or Framing)
+    if (RCSTAbits.OERR) { 
+        RCSTAbits.CREN = 0; 
+        RCSTAbits.CREN = 1; 
+    }
 
-        if (c == 0x02) {
-            esp_mode = 1; 
-            rx_idx = 0;
-            
-            // Non-blocking ACK send
-            uint16_t timeout = 500;
-            TXREG = 0x06;
-            while(!TXSTAbits.TRMT && --timeout > 0); 
+    // 2. Transmit bytes without resetting TXEN
+    for(uint8_t i = 0; i < length; i++) {
+        uint16_t timeout = 50000; // Increased for reliable detection
+        TXREG = data[i];
+        
+        // Wait for buffer ready (TXIF)
+        while(!PIR1bits.TXIF && --timeout > 0);
+        
+        // If timeout reaches 0, the hardware is unresponsive (ESP missing/grounded)
+        if(timeout == 0) {
+            esp_mode = ESP_IDLE_MODE;
+            TXSTAbits.TXEN = 0; // Disable TX
+            TXSTAbits.TXEN = 1; // Re-enable to clear the internal buffer
+            return 0; // Trigger the "ESP FAIL" condition
         }
     }
+    
+    // 3. Final wait for last byte to physically leave the chip
+    uint16_t timeout = 50000;
+    while(!TXSTAbits.TRMT && --timeout > 0);
+    
+    // Success: The bytes were handed to the hardware
+    return (timeout > 0);
 }
 
-uint8_t send_to_esp(char *data, uint8_t length) {
-    uint8_t old_gie = INTCONbits.GIE;
-    INTCONbits.GIE = 0; 
-    
-    // 1. Transmit packet with timeout
-    for(uint8_t i = 0; i < length; i++) {
-        TXREG = data[i];
-        uint16_t tx_timeout = 1000;
-        // Wait for buffer to clear, but break if it takes too long
-        while(!TXSTAbits.TRMT && --tx_timeout > 0); 
-        if(tx_timeout == 0) {
-            INTCONbits.GIE = old_gie;
-            return 0; // Transmit failed
-        }
+uint8_t wait_for_handshake(uint8_t send_byte, uint8_t expect_byte) {
+    // 1. Send the byte only if TX is ready
+    if(PIR1bits.TXIF) {
+        TXREG = send_byte;
+    } else {
+        return 0; // TX busy, fail immediately to prevent lockup
     }
-    INTCONbits.GIE = old_gie;
     
-    // 2. Poll for ACK with timeout
-    uint32_t timeout = 1000;
-    while(timeout-- > 0) {
+    // 2. Poll with a significantly smaller timeout
+    uint16_t timeout = 5000; 
+    while(--timeout > 0) {
+        if(RCSTAbits.OERR) { // Clear overrun errors
+            RCSTAbits.CREN = 0;
+            RCSTAbits.CREN = 1;
+        }
         if(PIR1bits.RCIF) {
-            if(RCREG == 0x06) return 1; 
+            return (RCREG == expect_byte);
         }
     }
-    return 0; // Timeout, no ACK
+    return 0;
 }
 
 void main(void) {
-    
+    // 20MHz Clock, 9600 Baud @ BRGH=1
+    TXSTAbits.BRGH = 1;     // High Speed mode
+    TXSTAbits.SYNC = 0;     // Asynchronous mode
+    BAUDCONbits.BRG16 = 0;  // 8-bit mode
+    SPBRG = 129;            // (20,000,000 / (16 * 9600)) - 1 = 129
+    RCSTAbits.SPEN = 1;     // Enable Serial Port
+    TXSTAbits.TXEN = 1;     // Enable Transmitter
+    RCSTAbits.CREN = 1;     // Enable Receiver
     __delay_ms(500);//for display to power up
   // Configuration
     ECANCON = 0x00;
@@ -616,6 +629,22 @@ void main(void) {
           // Splash screen (standard delay allowed here as no other tasks are running)
     __delay_ms(2000);
     lcd_cmd_direct(LCD_CLR);
+    
+    if (wait_for_handshake(0xAA, 0x55)) {
+        sprintf(display_buffer[3], "Handshake OK");
+    } else {
+        sprintf(display_buffer[3], "Handshake FAIL");
+    }
+    esp_mode = ESP_IDLE_MODE;
+    lcd_move_cursor(lcd_line_addrs[2]);
+    sprintf(display_buffer[2], "RX:-0x%02X-", RCREG);
+    lcd_write(display_buffer[2]);
+    __delay_ms(2000);
+    
+    lcd_move_cursor(lcd_line_addrs[3]);
+    lcd_write(display_buffer[3]);
+    __delay_ms(1000);
+    
     PIE1bits.RCIE = 1; // Enable UART Receive Interrupt
     // Start interrupts for main loop
     T0CON = 0x84; INTCONbits.TMR0IE = 1; PIE1bits.ADIE = 1; INTCONbits.GIE = 1; INTCONbits.PEIE = 1;
@@ -631,62 +660,94 @@ void main(void) {
 
     while(1) {
         
+        //watchdog
+        if (esp_mode != ESP_IDLE_MODE) {
+            esp_timeout_counter++;
+            if (esp_timeout_counter > 50000) { // Adjust based on your loop speed
+                esp_mode = ESP_IDLE_MODE;
+                rx_idx = 0;
+                esp_timeout_counter = 0;
+            }
+        } else {
+            esp_timeout_counter = 0;
+        }
+        
         poll_buttons();
         
         handle_buttons();
         
         control_output();
         
-        if(time_to_send){
-            time_to_send=0;
-            sprintf(display_buffer[3], "Sending to ESP");
-            lcd_move_cursor(lcd_line_addrs[3]);
-            lcd_write(display_buffer[3]);
-            
-            uint8_t raw_buffer[9];
-            char ascii_hex_packet[18];
-            memcpy(&raw_buffer[0], &t_h, 2);
-            memcpy(&raw_buffer[2], &t_b, 2);
-            raw_buffer[4] = FAN;
-            raw_buffer[5] = LIGHT;
-            raw_buffer[6] = HEATER;
-            memcpy(&raw_buffer[7], &box_setpoint, 2);
-            const char hex_chars[] = "0123456789ABCDEF";
-            for(uint8_t i = 0; i < 9; i++) {
-                ascii_hex_packet[i * 2]     = hex_chars[(raw_buffer[i] >> 4) & 0x0F];
-                ascii_hex_packet[i * 2 + 1] = hex_chars[raw_buffer[i] & 0x0F];
-            }
-            if (send_to_esp(ascii_hex_packet, 18)) {
-                sprintf(display_buffer[3], "ESP SUCCESS        ");
+        if (esp_mode == ESP_IDLE_MODE) {
+            static uint8_t retry_count = 0;
+            if(time_to_send){
+                time_to_send=0;
+                if (esp_active){
+                    sprintf(display_buffer[3], "Sending to ESP");
+                    lcd_move_cursor(lcd_line_addrs[3]);
+                    lcd_write(display_buffer[3]);
 
-            } else {
-                sprintf(display_buffer[3], "ESP FAIL           ");
-            } 
-            lcd_move_cursor(lcd_line_addrs[3]);
-            lcd_write(display_buffer[3]);
+                    uint8_t raw_buffer[9];
+                    char ascii_hex_packet[18];
+                    memcpy(&raw_buffer[0], &t_h, 2);
+                    memcpy(&raw_buffer[2], &t_b, 2);
+                    raw_buffer[4] = FAN;
+                    raw_buffer[5] = LIGHT;
+                    raw_buffer[6] = HEATER;
+                    memcpy(&raw_buffer[7], &box_setpoint, 2);
+                    const char hex_chars[] = "0123456789ABCDEF";
+                    for(uint8_t i = 0; i < 9; i++) {
+                        ascii_hex_packet[i * 2]     = hex_chars[(raw_buffer[i] >> 4) & 0x0F];
+                        ascii_hex_packet[i * 2 + 1] = hex_chars[raw_buffer[i] & 0x0F];
+                    }
+                    if (send_to_esp(ascii_hex_packet, 18)) {
+                        sprintf(display_buffer[3], "ESP SUCCESS        ");
+                        retry_count = 0;
+                    } else {
+                        retry_count++;
+                        if (retry_count > 3) {
+                            sprintf(display_buffer[3], "NO ESP DETECTED");
+                        } else {
+                            sprintf(display_buffer[3], "ESP FAIL");
+                        }
+                    } 
+                    lcd_move_cursor(lcd_line_addrs[3]);
+                    lcd_write(display_buffer[3]);
+                }
+            }else {
+                // Keep the error message static
+                sprintf(display_buffer[3], "NO ESP DETECTED");
+                lcd_move_cursor(lcd_line_addrs[3]);
+                lcd_write(display_buffer[3]);
+            }
+
+            if (flag_10hz) {
+                flag_10hz = 0;
+
+                if (adc_ready) {
+                    adc_ready = 0;
+
+                    if (!isr_channel) {
+                        t_h = heater_temp_lut[adc_val[0]];    
+                    }
+                    else {
+                        t_b = box_temp_lut[adc_val[1]];
+                    }
+                }
+
+                if (menu_state == main_menu){
+                    sprintf(display_buffer[1], "H:%3d.%1d B:%3d.%1d", t_h / 10, t_h % 10, t_b / 10, t_b % 10);
+                    sprintf(display_buffer[2], "F:%d L:%d H:%d S:%3d.%1d", FAN, LIGHT, HEATER, box_setpoint / 10, box_setpoint % 10);
+
+                }
+
+                send_to_display();
+            
+            }
         }
-        
-        if (flag_10hz) {
-            flag_10hz = 0;
-            
-            if (adc_ready) {
-                adc_ready = 0;
-                
-                if (!isr_channel) {
-                    t_h = heater_temp_lut[adc_val[0]];    
-                }
-                else {
-                    t_b = box_temp_lut[adc_val[1]];
-                }
-            }
-            
-            if (menu_state == main_menu){
-                sprintf(display_buffer[1], "H:%3d.%1d B:%3d.%1d", t_h / 10, t_h % 10, t_b / 10, t_b % 10);
-                sprintf(display_buffer[2], "F:%d L:%d H:%d S:%3d.%1d", FAN, LIGHT, HEATER, box_setpoint / 10, box_setpoint % 10);
-
-            }
-            
-            send_to_display();
+        else {
+            // ESP is active, skip display updates to prevent timing contention
+            // Optional: clear the display or show a "BUSY" message once
         }
     }
 }

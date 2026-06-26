@@ -4,8 +4,16 @@
 
 WiFiClient client;
 
+char rx_buffer[21]; // Buffer for 18 chars + RSSI + terminator
+bool data_ready = false;
+
 void setup() {
   Serial.begin(9600); 
+
+  while(!Serial.available());
+  if (Serial.read() == 0xAA) {
+    Serial.write(0x55); // Respond
+  }
 
   WiFi.begin(WIFI_SSID, WIFI_PASS);
   unsigned long start = millis();
@@ -21,39 +29,36 @@ void byteToHex(uint8_t val, char* buf) {
 }
 
 void loop() {
-  if (WiFi.status() != WL_CONNECTED) {
-    ESP.restart();
-  }
-
+  // 1. NON-BLOCKING SERIAL READ
   if (Serial.available()) {
     if (Serial.read() == 0x02) {
-      Serial.write(0x06); // Send ACK to PIC
-      
-      char payload[21]; // 18 from PIC + 2 for RSSI + null terminator
+      // Read 18 bytes from PIC immediately
       uint8_t i = 0;
-      unsigned long start = millis();
-      
-      // Read the 18 chars from PIC
-      while(i < 18 && (millis() - start < 500)) {
-        if(Serial.available()) {
-            payload[i++] = Serial.read();
+      while (i < 18) {
+        if (Serial.available()) {
+          rx_buffer[i++] = Serial.read();
         }
       }
       
-      // Get RSSI (convert negative int to absolute byte)
-      int32_t rssi = WiFi.RSSI();
-      uint8_t rssi_val = (uint8_t)abs(rssi); 
+      // Append RSSI
+      uint8_t rssi_val = (uint8_t)abs(WiFi.RSSI());
+      byteToHex(rssi_val, &rx_buffer[18]);
+      rx_buffer[20] = '\0';
       
-      // Append RSSI as 2 hex chars
-      byteToHex(rssi_val, &payload[18]);
-      payload[20] = '\0';
-      
-      // Send total 20 chars to server
-      client.setTimeout(2000);
+      // 2. ACK IMMEDIATELY
+      Serial.write(0x06);
+      data_ready = true;
+    }
+  }
+
+  // 3. PROCESS NETWORK AFTER ACK
+  if (data_ready) {
+    if (WiFi.status() == WL_CONNECTED) {
       if (client.connect(SERVER_IP, SERVER_PORT)) {
-        client.print(payload);
+        client.print(rx_buffer);
         client.stop();
       }
     }
+    data_ready = false; // Reset for next packet
   }
 }
