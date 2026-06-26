@@ -233,7 +233,7 @@ volatile uint8_t esp_mode = 0;
 volatile uint8_t rx_idx = 0;
 volatile uint8_t data_ready_flag = 0;
 volatile uint8_t rx_buf[13];
-
+volatile uint8_t ack_received = 0;
 
 void soft_putch(char data) {
     uint8_t gie_backup = INTCONbits.GIE;
@@ -354,10 +354,14 @@ void __interrupt() ISR(void) {
         
         char c = RCREG;
         
-        if (c == 0x02) {
+        if (c == 0x06) {
+            ack_received = 1; // Set flag when ACK arrives
+        }
+        else if (c == 0x02) {
             esp_mode = ESP_RX_MODE;
             rx_idx = 0;
-        } else if (esp_mode == ESP_RX_MODE) {
+        }
+        else if (esp_mode == ESP_RX_MODE) {
             if (rx_idx < 12) {
                 rx_buf[rx_idx++] = c;
                 if (rx_idx >= 12) {
@@ -526,13 +530,20 @@ void send_to_display(void) {
 }
 
 uint8_t send_to_esp(char *data, uint8_t length) {
-    // 1. Check for UART error (Overrun or Framing)
+    
+    ack_received = 0;//reset
+    
+    // Check for UART error (Overrun or Framing)
     if (RCSTAbits.OERR) { 
         RCSTAbits.CREN = 0; 
         RCSTAbits.CREN = 1; 
     }
+    
+    // send start byte
+    TXREG = 0x02;
+    while(!PIR1bits.TXIF);
 
-    // 2. Transmit bytes without resetting TXEN
+    // Transmit bytes without resetting TXEN
     for(uint8_t i = 0; i < length; i++) {
         uint16_t timeout = 50000; // Increased for reliable detection
         TXREG = data[i];
@@ -549,16 +560,31 @@ uint8_t send_to_esp(char *data, uint8_t length) {
         }
     }
     
-    // 3. Final wait for last byte to physically leave the chip
+    // Final wait for last byte to physically leave the chip
     uint16_t timeout = 50000;
     while(!TXSTAbits.TRMT && --timeout > 0);
-    
-    // Success: The bytes were handed to the hardware
-    return (timeout > 0);
+    if(timeout == 0) return 0;
+
+    // Wait for ACK flag set by ISR
+    timeout = 50000; 
+    while(!ack_received && --timeout > 0);
+
+    if (ack_received) {
+        return 1; // ACK received
+    }
+    return 0; // Timeout
 }
 
-uint8_t wait_for_handshake(uint8_t send_byte, uint8_t expect_byte) {
-    // 1. Send the byte only if TX is ready
+uint8_t wait_for_handshake(uint8_t send_byte) {
+    // Flush out garbage from rx
+    if(RCSTAbits.OERR) { 
+        RCSTAbits.CREN = 0;
+        RCSTAbits.CREN = 1;
+    }
+    while(PIR1bits.RCIF) {
+        volatile char dummy = RCREG;
+    }
+    // Send the byte only if TX is ready
     if(PIR1bits.TXIF) {
         TXREG = send_byte;
     } else {
@@ -573,7 +599,7 @@ uint8_t wait_for_handshake(uint8_t send_byte, uint8_t expect_byte) {
             RCSTAbits.CREN = 1;
         }
         if(PIR1bits.RCIF) {
-            return (RCREG == expect_byte);
+            return (RCREG);
         }
     }
     return 0;
@@ -629,15 +655,15 @@ void main(void) {
           // Splash screen (standard delay allowed here as no other tasks are running)
     __delay_ms(2000);
     lcd_cmd_direct(LCD_CLR);
-    
-    if (wait_for_handshake(0xAA, 0x55)) {
-        sprintf(display_buffer[3], "Handshake OK");
+    uint8_t rx_byte = wait_for_handshake(0xAA);
+    if (rx_byte == 0x55) {
+        sprintf(display_buffer[3], "ESP OK 0x%02X", rx_byte);
     } else {
-        sprintf(display_buffer[3], "Handshake FAIL");
+        sprintf(display_buffer[3], "ESP FAIL 0x%02X", rx_byte);
     }
     esp_mode = ESP_IDLE_MODE;
     lcd_move_cursor(lcd_line_addrs[2]);
-    sprintf(display_buffer[2], "RX:-0x%02X-", RCREG);
+    sprintf(display_buffer[2], "RX:0x%02X", RCREG);
     lcd_write(display_buffer[2]);
     __delay_ms(2000);
     
@@ -714,11 +740,12 @@ void main(void) {
                     lcd_move_cursor(lcd_line_addrs[3]);
                     lcd_write(display_buffer[3]);
                 }
-            }else {
+                else {
                 // Keep the error message static
                 sprintf(display_buffer[3], "NO ESP DETECTED");
                 lcd_move_cursor(lcd_line_addrs[3]);
                 lcd_write(display_buffer[3]);
+                }
             }
 
             if (flag_10hz) {
