@@ -20,14 +20,14 @@ const HeaterTable = ({ records = [], columnStats }) => {
                 <tbody className="heaterTableBody">
                     {records.map((record) => (
                         <tr key={record.id} className="heaterTableRow">
-                            <td className="heaterTableCell2">
+                            <td className="heaterTableCell2 smaller">
                                 {new Date(record.datetime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })}
                             </td>
-                            <td className="heaterTableCell">{record.setpoint}</td>
-                            <td className="heaterTableCell">{record.tempBox}</td>
-                            <td className="heaterTableCell">{record.tempHeater}</td>
-                            <td className="heaterTableCell">F:{record.fan} L:{record.light} H:{record.heater}</td>
-                            <td className="heaterTableCell">{record.rssi}</td>
+                            <td className="heaterTableCell smaller">{record.setpoint}</td>
+                            <td className="heaterTableCell smaller">{record.tempBox}</td>
+                            <td className="heaterTableCell smaller">{record.tempHeater}</td>
+                            <td className="heaterTableCell smaller">F:{record.fan} L:{record.light} H:{record.heater}</td>
+                            <td className="heaterTableCell smaller">{record.rssi}</td>
                         </tr>
                     ))}
                 </tbody>
