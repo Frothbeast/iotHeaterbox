@@ -16,10 +16,6 @@ const ControlBar = ({ cl1pClick, selectedHours, onHoursChange, columnStats, reco
       console.error("Error:", error);
     }
   };
-  
-  const dec2hex = (newsetpoint) => ({
-    hex = newsetpoint.toString(16)
-  })
 
   const getOptions = (min, max) => ({
     responsive: true,
@@ -31,7 +27,8 @@ const ControlBar = ({ cl1pClick, selectedHours, onHoursChange, columnStats, reco
     },
     elements: { point: { radius: 0, hitRadius: 0, hoverRadius: 0 } }
   });
-  const newsetpoint = 40;
+  
+  const [newsetpoint, setNewsetpoint] = useState(40);
 
   return (
     <header className="controlBar">
@@ -60,10 +57,10 @@ const ControlBar = ({ cl1pClick, selectedHours, onHoursChange, columnStats, reco
           <span className="unit">°C</span>
         </div>
         <div className="buttonRow">
-          <button className="setpointup myBUTTon" onClick={newsetpoint++}>+</button>
-          <button className="setpointup myBUTTon" onClick={newsetpoint--}>-</button>
+          <button className="setpointup myBUTTon" onClick={() => setNewsetpoint(prev => prev + 1)}>+</button>
+          <button className="setpointup myBUTTon" onClick={() => setNewsetpoint(prev => prev - 1)}>-</button>
           <div className="setpoint">{newsetpoint}</div>
-          <button className="setpointsend myBUTTon" onClick={sendHexCommand}>Send</button>
+          <button className="setpointsend myBUTTon" onClick={() => sendHexCommand(newsetpoint.toString(16))}>Send</button>
           
         </div>
         <div className="buttonRow">
