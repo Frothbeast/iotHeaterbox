@@ -1,5 +1,6 @@
 import HeaterChart from '../HeaterTable/HeaterChart';
 import './ControlBar.css';
+import React, { useState } from 'react';
 
 const ControlBar = ({ cl1pClick, selectedHours, onHoursChange, columnStats, records, toggleSidebar, isSidebarOpen, serverTime }) => {
   
@@ -60,7 +61,7 @@ const ControlBar = ({ cl1pClick, selectedHours, onHoursChange, columnStats, reco
           <button className="setpointup myBUTTon" onClick={() => setNewsetpoint(prev => prev + 1)}>+</button>
           <button className="setpointup myBUTTon" onClick={() => setNewsetpoint(prev => prev - 1)}>-</button>
           <div className="setpoint">{newsetpoint}</div>
-          <button className="setpointsend myBUTTon" onClick={() => sendHexCommand(newsetpoint.toString(16))}>Send</button>
+          <button className="setpointsend myBUTTon" onClick={() => sendHexCommand(newsetpoint.toString(10).padStart(3, '0'))}>Send</button>
           
         </div>
         <div className="buttonRow">
