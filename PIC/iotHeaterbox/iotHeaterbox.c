@@ -171,17 +171,18 @@ volatile uint8_t cursor_mode = LCD_ON_NO_CURSOR;
 uint8_t lcd_line_addrs[] = {LCD_L1, LCD_L2, LCD_L3, LCD_L4};
 
 
-#define ADDR_INIT  0xFF
-#define ADDR_SP    0x00
-#define ADDR_FAN   0x02
-#define ADDR_KP    0x04
-#define ADDR_KI    0x06
+#define ADDR_INIT   0x00
+#define ADDR_FAN    0x01
+#define ADDR_LIGHT  0x02
+#define ADDR_SP     0x04
+#define ADDR_KP     0x06
+#define ADDR_KI     0x08
 
 volatile uint16_t t_h = 0.0;
 volatile uint16_t t_b = 0.0;
 volatile uint8_t adc_ready = 0;
 volatile uint8_t isr_channel = 0;
-volatile int16_t box_setpoint = 400;
+volatile int16_t box_setpoint = 0;
 volatile int16_t heater_limit = 150;
 volatile uint16_t adc_val[2];
 volatile uint8_t flag_10hz = 0;
@@ -199,7 +200,6 @@ volatile uint8_t main_index = 4;
 #define L   1
 #define H   2
 #define SP  3
-
 
 volatile uint8_t cursor_position[] = {main_F, main_L, main_H, main_S};
 uint8_t last_menu_state = 0xFF;
@@ -516,6 +516,19 @@ void handle_buttons(void){
         select_press=0;
         if (select_mode){
             select_mode=0;
+            switch (main_index){
+                case SP:
+                    DATA_EE_WriteInt(ADDR_SP, box_setpoint);
+                    break;
+                case F:
+                    DATA_EE_Write(ADDR_FAN, FAN);
+                    break;
+                case L:
+                    DATA_EE_Write(ADDR_LIGHT, LIGHT);
+                    break;
+                default:
+                    break;
+            }
             cursor_mode = LCD_ON_CURSOR;
         }
         else {
@@ -524,17 +537,6 @@ void handle_buttons(void){
                     cursor_mode = LCD_ON_CURSOR_BLINK;
                     lcd_cmd_direct(cursor_mode);
                     select_mode = 1;
-                    switch (main_index){
-                        case SP:
-                            DATA_EE_WriteInt(ADDR_SP, box_setpoint);
-                            break;
-                        case F:
-                            break;
-                        case L:
-                            break;
-                        default:
-                            break;
-                    }
                     break;
                 default:
                     break;
@@ -679,11 +681,15 @@ void main(void) {
     lcd_move_cursor(lcd_line_addrs[3]);
     lcd_write(display_buffer[3]);
     
-    if(DATA_EE_ReadInt(ADDR_INIT) != 0xAA){
+    if(DATA_EE_Read(ADDR_INIT) != 0xAA){
         DATA_EE_Write(ADDR_INIT, 0xAA);
+        DATA_EE_Write(ADDR_FAN, 0);
+        DATA_EE_Write(ADDR_LIGHT, 0);
         DATA_EE_WriteInt(ADDR_SP, 400);
     } 
-    box_setpoint = DATA_EE_ReadInt(ADDR_SP);    
+    box_setpoint = DATA_EE_ReadInt(ADDR_SP);
+    FAN = DATA_EE_Read(ADDR_FAN);
+    LIGHT = DATA_EE_Read(ADDR_LIGHT);
     
           // Splash screen (standard delay allowed here as no other tasks are running)
     __delay_ms(2000);

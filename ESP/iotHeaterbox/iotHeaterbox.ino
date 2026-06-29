@@ -3,6 +3,7 @@
 #include "config.h"
 
 WiFiClient client;
+WiFiServer server(SERVER_PORT);
 bool data_ready = false; 
 unsigned long last_attempt = 0;
 
@@ -12,7 +13,7 @@ void setup() {
    Serial.begin(9600, SERIAL_8N1); 
   
   unsigned long serialStart = millis();
-  while(!Serial.available() && (millis() - serialStart < 5000)){yield()};
+  while(!Serial.available() && (millis() - serialStart < 5000)){yield();}
   if (Serial.available() && Serial.read() == 0xAA) {
     Serial.write(0x55); // Respond
   }

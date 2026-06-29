@@ -59,6 +59,7 @@ const ControlBar = ({ cl1pClick, selectedHours, onHoursChange, columnStats, reco
         <div className="lastRun">
           <span className="label">Last Reading</span>
           <span className="value">{columnStats?.lastTime ?? "N/a"}</span>
+          <span> </span>
         </div>
         <div className="lastTemp">
           <span className="label">SP</span>
@@ -73,8 +74,8 @@ const ControlBar = ({ cl1pClick, selectedHours, onHoursChange, columnStats, reco
         </div>
         <div className="buttonRow">
           <button className="setpointup myBUTTon" onClick={() => setNewsetpoint(prev => prev + 1)}>+</button>
-          <button className="setpointup myBUTTon" onClick={() => setNewsetpoint(prev => prev - 1)}>-</button>
-          <div className="setpoint">{newsetpoint}</div>
+          <button className="setpointdown myBUTTon" onClick={() => setNewsetpoint(prev => prev - 1)}>-</button>
+          <div className="setpoint value">{newsetpoint}</div>
           <button className={`setpointsend myBUTTon ${sendStatus === 'sending' ? 'sending' : ''} ${sendStatus === 'success' ? 'success' : ''}`} onClick={handleSend}>
             {sendStatus === 'sending' ? "..." : "Send"}
           </button>
