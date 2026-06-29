@@ -77,7 +77,7 @@ def bootstrap_db():
 @app.route('/api/send-command', methods=['POST'])
 def send_command():
     data = request.json
-    print(f"DEBUG: Received command: {data.get('hex')}")
+    print(f"DEBUG: Received command: {data.get('hex')}", flush=True)
     hex_str = data.get('hex') 
     
     try:
@@ -89,11 +89,11 @@ def send_command():
         
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.settimeout(2)
-            s.connect((HEATER_ESP_IP, COLLECTOR_HOST_PORT))
+            s.connect((HEATER_ESP_IP, int(COLLECTOR_HOST_PORT)))
             s.sendall(command_bytes)
             # Wait for 1-byte ACK from ESP
             ack = s.recv(1)
-            print(f"DEBUG: Received ACK: {ack}")
+            print(f"DEBUG: Received ACK: {ack}", flush=True)
             if ack == b'\x06': # ACK byte
                 return jsonify({"status": "success"}), 200
             return jsonify({"status": "fail", "error": "No ACK"}), 500
@@ -101,7 +101,7 @@ def send_command():
         return jsonify({"status": "success"}), 200
     except Exception as e:
         result = f"Error: {str(e)}"
-        print(f"DEBUG: Socket send result: {result}")
+        print(f"DEBUG: Socket send result: {result}", flush=True)
         return jsonify({"status": "fail", "error": str(e)}), 500
 
 @app.route('/', defaults={'path': ''})
