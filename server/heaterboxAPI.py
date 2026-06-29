@@ -77,7 +77,6 @@ def bootstrap_db():
 @app.route('/api/send-command', methods=['POST'])
 def send_command():
     data = request.json
-    # hex_str is the 3-character string, e.g., "040"
     hex_str = data.get('hex') 
     
     try:
@@ -91,6 +90,11 @@ def send_command():
             s.settimeout(2)
             s.connect((HEATER_ESP_IP, COLLECTOR_HOST_PORT))
             s.sendall(command_bytes)
+            # Wait for 1-byte ACK from ESP
+            ack = s.recv(1)
+            if ack == b'\x06': # ACK byte
+                return jsonify({"status": "success"}), 200
+            return jsonify({"status": "fail", "error": "No ACK"}), 500
             
         return jsonify({"status": "success"}), 200
     except Exception as e:

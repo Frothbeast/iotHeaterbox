@@ -173,10 +173,9 @@ uint8_t lcd_line_addrs[] = {LCD_L1, LCD_L2, LCD_L3, LCD_L4};
 
 #define ADDR_INIT  0xFF
 #define ADDR_SP    0x00
-#define ADDR_FAN   0x10
-#define ADDR_KP    0x20
-#define ADDR_KI    0x24
-#define AD
+#define ADDR_FAN   0x02
+#define ADDR_KP    0x04
+#define ADDR_KI    0x06
 
 volatile uint16_t t_h = 0.0;
 volatile uint16_t t_b = 0.0;
@@ -195,6 +194,12 @@ volatile uint8_t main_index = 4;
 #define main_L              174
 #define main_H              178
 #define main_S              184
+
+#define F   0
+#define L   1
+#define H   2
+#define SP  3
+
 
 volatile uint8_t cursor_position[] = {main_F, main_L, main_H, main_S};
 uint8_t last_menu_state = 0xFF;
@@ -226,9 +231,12 @@ float Kp = 10.0, Ki = 0.5, Kd = 0.1;
 uint8_t fan_mode = 0;
 uint8_t control_active = 1;
 
-#define ESP_TX_MODE     2
-#define ESP_RX_MODE     1
-#define ESP_IDLE_MODE   0
+#define ESP_IDLE_MODE       0
+#define ESP_RX_MODE         1
+#define ESP_TX_MODE         2
+#define ESP_SETPOINT_MODE   3
+
+
 volatile uint8_t esp_mode = 0;
 volatile uint8_t rx_idx = 0;
 volatile uint8_t data_ready_flag = 0;
@@ -309,6 +317,19 @@ uint8_t DATA_EE_Read(uint8_t addr) {
     EECON1bits.RD = 1; return EEDATA;
 }
 
+void DATA_EE_WriteInt(uint8_t addr, int16_t val) {
+    // Write High Byte
+    DATA_EE_Write(addr, (uint8_t)(val >> 8));
+    // Write Low Byte
+    DATA_EE_Write(addr + 1, (uint8_t)(val & 0xFF));
+}
+
+int16_t DATA_EE_ReadInt(uint8_t addr) {
+    uint8_t high = DATA_EE_Read(addr);
+    uint8_t low = DATA_EE_Read(addr + 1);
+    return (int16_t)((high << 8) | low);
+}
+
 void eeprom_write_f(uint8_t addr, float val) {
     uint8_t *p = (uint8_t *)&val;
     for(uint8_t i=0; i<4; i++) DATA_EE_Write(addr+i, p[i]);
@@ -356,6 +377,19 @@ void __interrupt() ISR(void) {
         
         if (c == 0x06) {
             ack_received = 1; // Set flag when ACK arrives
+        }
+        else if (c == 0xAA) {
+            esp_mode = ESP_SETPOINT_MODE;
+            rx_idx = 0;
+        }
+        else if (esp_mode == ESP_SETPOINT_MODE) {
+            rx_buf[rx_idx++] = c; // Capture 3 digits
+            if (rx_idx >= 3) {
+                esp_mode = ESP_IDLE_MODE;
+                int16_t val = (rx_buf[0]-'0')*100 + (rx_buf[1]-'0')*10 + (rx_buf[2]-'0');
+                box_setpoint = val;
+                DATA_EE_WriteInt(ADDR_SP, box_setpoint);
+            }
         }
         else if (c == 0x02) {
             esp_mode = ESP_RX_MODE;
@@ -415,16 +449,16 @@ void handle_buttons(void){
             case main_menu:
                 if(select_mode){
                     switch(main_index){
-                        case 0://fan
+                        case F://fan
                             FAN=1;
                             break;
-                        case 1://light
+                        case L://light
                             LIGHT=1;
                             break;
-                        case 2://heater
+                        case H://heater
                             HEATER=1;
                             break;
-                        case 3://setpoint
+                        case SP://setpoint
                             box_setpoint = box_setpoint+10;
                             break;
                             
@@ -490,6 +524,17 @@ void handle_buttons(void){
                     cursor_mode = LCD_ON_CURSOR_BLINK;
                     lcd_cmd_direct(cursor_mode);
                     select_mode = 1;
+                    switch (main_index){
+                        case SP:
+                            DATA_EE_WriteInt(ADDR_SP, box_setpoint);
+                            break;
+                        case F:
+                            break;
+                        case L:
+                            break;
+                        default:
+                            break;
+                    }
                     break;
                 default:
                     break;
@@ -633,6 +678,12 @@ void main(void) {
     lcd_write(display_buffer[2]);
     lcd_move_cursor(lcd_line_addrs[3]);
     lcd_write(display_buffer[3]);
+    
+    if(DATA_EE_ReadInt(ADDR_INIT) != 0xAA){
+        DATA_EE_Write(ADDR_INIT, 0xAA);
+        DATA_EE_WriteInt(ADDR_SP, 400);
+    } 
+    box_setpoint = DATA_EE_ReadInt(ADDR_SP);    
     
           // Splash screen (standard delay allowed here as no other tasks are running)
     __delay_ms(2000);

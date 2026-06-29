@@ -4,6 +4,20 @@ import React, { useState } from 'react';
 
 const ControlBar = ({ cl1pClick, selectedHours, onHoursChange, columnStats, records, toggleSidebar, isSidebarOpen, serverTime }) => {
   
+  const [sendStatus, setSendStatus] = useState('idle'); // 'idle', 'sending', 'success'
+  
+  const handleSend = async () => {
+    setSendStatus('sending');
+    const success = await sendHexCommand(newsetpoint.toString(10).padStart(3, '0'));
+    
+    if (success) {
+      setSendStatus('success');
+      setTimeout(() => setSendStatus('idle'), 1000);
+    } else {
+      setSendStatus('idle'); // Or 'error'
+    }
+  };
+
   const sendHexCommand = async (hex) => {
     try {
       const response = await fetch(`${process.env.REACT_APP_HEATERBOX_API_URL}/api/send-command`, {
@@ -61,8 +75,9 @@ const ControlBar = ({ cl1pClick, selectedHours, onHoursChange, columnStats, reco
           <button className="setpointup myBUTTon" onClick={() => setNewsetpoint(prev => prev + 1)}>+</button>
           <button className="setpointup myBUTTon" onClick={() => setNewsetpoint(prev => prev - 1)}>-</button>
           <div className="setpoint">{newsetpoint}</div>
-          <button className="setpointsend myBUTTon" onClick={() => sendHexCommand(newsetpoint.toString(10).padStart(3, '0'))}>Send</button>
-          
+          <button className={`setpointsend myBUTTon ${sendStatus === 'sending' ? 'sending' : ''} ${sendStatus === 'success' ? 'success' : ''}`} onClick={handleSend}>
+            {sendStatus === 'sending' ? "..." : "Send"}
+          </button>
         </div>
         <div className="buttonRow">
           <button className="sidebarButton myBUTTon" onClick={toggleSidebar}>

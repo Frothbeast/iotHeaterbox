@@ -181,3 +181,12 @@ input[type="submit"] {
   padding: 0 2cqw;
 }
 
+.setpointsend {
+  transition: background-color 0.3s;
+}
+.setpointsend.sending {
+  background-color: red;
+}
+.setpointsend.success {
+  background-color: green;
+}
