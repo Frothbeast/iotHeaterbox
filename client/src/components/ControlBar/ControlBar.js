@@ -8,7 +8,7 @@ const ControlBar = ({ cl1pClick, selectedHours, onHoursChange, columnStats, reco
   
   const handleSend = async () => {
     setSendStatus('sending');
-    const success = await sendHexCommand(newsetpoint.toString(10).padStart(3, '0'));
+    const success = await sendHexCommand(newsetpoint.toString(10).padEnd(3, '0'));
     
     if (success) {
       setSendStatus('success');

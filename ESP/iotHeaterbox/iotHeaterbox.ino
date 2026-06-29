@@ -23,6 +23,8 @@ void setup() {
   while (WiFi.status() != WL_CONNECTED && (millis() - start < 15000)) {
     delay(500);
   }
+
+  server.begin();
 }
 
 void byteToHex(uint8_t val, char* buf) {
