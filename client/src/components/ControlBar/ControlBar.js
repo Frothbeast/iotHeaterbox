@@ -75,7 +75,7 @@ const ControlBar = ({ cl1pClick, selectedHours, onHoursChange, columnStats, reco
         <div className="buttonRow">
           <button className="setpointup myBUTTon" onClick={() => setNewsetpoint(prev => prev + 1)}>+</button>
           <button className="setpointdown myBUTTon" onClick={() => setNewsetpoint(prev => prev - 1)}>-</button>
-          <div className="setpoint value">{newsetpoint}</div>
+          <div className="setpoint value">New Setpoint:{newsetpoint}</div>
           <button className={`setpointsend myBUTTon ${sendStatus === 'sending' ? 'sending' : ''} ${sendStatus === 'success' ? 'success' : ''}`} onClick={handleSend}>
             {sendStatus === 'sending' ? "..." : "Send"}
           </button>
