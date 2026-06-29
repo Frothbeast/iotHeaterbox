@@ -38,9 +38,11 @@ void loop() {
   if (serverClient.connected()) {
     if (serverClient.available() >= 4) {
       char cmd[4];
-      serverClient.readBytes(cmd, 4); 
+      serverClient.readBytes(cmd, 4);
+      serverClient.write(0x06); //ack right away
+      serverClient.flush(); 
       Serial.write((uint8_t*)cmd, 4);
-      serverClient.write(0x06); 
+      delay(50);
       serverClient.stop();
     }
   }

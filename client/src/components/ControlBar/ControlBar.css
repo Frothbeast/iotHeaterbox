@@ -72,6 +72,24 @@
   width: 100%;
 }
 
+.buttonRow > * {
+  flex: 1;
+  font-family: inherit;
+  font-size: 1.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  padding: 10px;
+}
+
+.setpoint.value {
+  background: #34495e;
+  color: white;
+  border: 1px solid #2c3e50;
+  border-radius: 4px;
+}
+
 .sidebarButton,.cl1pButton, .selectedHours, .setpintup, .setpointsend, .setpointdown {
   flex: 1;
   display: flex;
