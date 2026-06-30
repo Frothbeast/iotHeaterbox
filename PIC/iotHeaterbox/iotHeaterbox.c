@@ -180,7 +180,7 @@ uint8_t lcd_line_addrs[] = {LCD_L1, LCD_L2, LCD_L3, LCD_L4};
 #define ADDR_CONTROL    0x03
 #define ADDR_SP         0x04
 #define ADDR_KP         0x06
-    #define ADDR_KI     0x08
+#define ADDR_KI         0x08
 
 volatile uint16_t t_h = 0.0;
 volatile uint16_t t_b = 0.0;
@@ -195,7 +195,7 @@ volatile uint8_t wifi_ticks = 0;
 volatile uint8_t menu_state = 0; 
 volatile uint8_t main_index = 4;
 
-#define main_C              140
+#define main_C              146
 #define main_F              170
 #define main_L              174
 #define main_H              178
