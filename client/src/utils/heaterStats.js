@@ -20,6 +20,7 @@ export const calculateColumnStats = (heaterRecords) => {
     lastHeaterTemp: lastRecord.tempHeater,
     lastHeater: lastRecord.heater,
     lastRSSI: lastRecord.rssi,
-    setpoint: lastRecord.setpoint
+    setpoint: lastRecord.setpoint,
+    control: lastRecord.control
   };
 };

@@ -65,6 +65,8 @@ def bootstrap_db():
             fan INT,
             light INT,
             heater INT,
+            control INT,
+            extra INT,
             setpoint DECIMAL(5,2),
             rssi INT       
         )
@@ -118,7 +120,7 @@ def get_data():
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
         query = """
-            SELECT datetime, tempBox, tempHeater, fan, light, heater, setpoint, rssi 
+            SELECT datetime, tempBox, tempHeater, fan, light, heater, control, extra setpoint, rssi 
             FROM heaterData 
             WHERE datetime > NOW() - INTERVAL %s HOUR 
             ORDER BY datetime DESC;
