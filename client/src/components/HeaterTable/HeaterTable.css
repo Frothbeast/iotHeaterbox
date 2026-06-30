@@ -31,8 +31,8 @@
 :root {    
   --heaterTable__header-backgroundColour: color-mix(in oklch, var(--menu-background), white 30%);
   --heaterTable__header-colour: color-mix(in oklch, var(--menu-colour), white 30%);
-  --heaterTable__header-font: 4cqw;
-  --heaterTable__data-font: 4cqw;
+  --heaterTable__header-font: 2cqw;
+  --heaterTable__data-font: 2cqw;
   --heaterTable__header-smallFont: 2.5cqw;
   --heaterTable__headerRow-height: 5.5cqw; 
   --heaterTable__header-height: calc(3 * var(--heaterTable__headerRow-height));

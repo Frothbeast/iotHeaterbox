@@ -72,7 +72,25 @@
   width: 100%;
 }
 
-.sidebarButton,.cl1pButton, .selectedHours {
+.buttonRow > * {
+  flex: 1;
+  font-family: inherit;
+  font-size: 1.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  padding: 10px;
+}
+
+.setpoint.value {
+  background: #34495e;
+  color: white;
+  border: 1px solid #2c3e50;
+  border-radius: 4px;
+}
+
+.sidebarButton,.cl1pButton, .selectedHours, .setpintup, .setpointsend, .setpointdown {
   flex: 1;
   display: flex;
   align-items: center;
@@ -165,19 +183,30 @@ input[type="submit"] {
   font-weight: bold;
   text-align: right;
   flex: 1;
+  padding: 0 0 0 1cqw;
 }
 
 .unit {
   color: #888888;
   font-style: italic;
   text-align: left;
-  font-size: 2cqw;
+  font-size: 1cqw;
+  padding: 0 1cqw 0 0;
 }
 .value {
   flex: 0 0 auto;
   color: var(--menu-colour);
   text-align: center;
   white-space: nowrap;
-  padding: 0 2cqw;
+  padding: 0 1cqw;
 }
 
+.setpointsend {
+  transition: background-color 0.3s;
+}
+.setpointsend.sending {
+  background-color: red;
+}
+.setpointsend.success {
+  background-color: green;
+}

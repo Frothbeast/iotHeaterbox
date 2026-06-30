@@ -1,7 +1,37 @@
 import HeaterChart from '../HeaterTable/HeaterChart';
 import './ControlBar.css';
+import React, { useState } from 'react';
 
 const ControlBar = ({ cl1pClick, selectedHours, onHoursChange, columnStats, records, toggleSidebar, isSidebarOpen, serverTime }) => {
+  
+  const [sendStatus, setSendStatus] = useState('idle'); // 'idle', 'sending', 'success'
+  
+  const handleSend = async () => {
+    setSendStatus('sending');
+    const success = await sendHexCommand(newsetpoint.toString(10).padEnd(3, '0'));
+    
+    if (success) {
+      setSendStatus('success');
+      setTimeout(() => setSendStatus('idle'), 1000);
+    } else {
+      setSendStatus('idle'); // Or 'error'
+    }
+  };
+
+  const sendHexCommand = async (hex) => {
+    try {
+      const response = await fetch(`${process.env.REACT_APP_HEATERBOX_API_URL}/api/send-command`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({hex})
+      });
+      if (!response.ok) throw new Error('Command failed');
+      console.log("Command sent successfully");
+    } catch (error) {
+      console.error("Error:", error);
+    }
+  };
+
   const getOptions = (min, max) => ({
     responsive: true,
     maintainAspectRatio: false,
@@ -12,6 +42,8 @@ const ControlBar = ({ cl1pClick, selectedHours, onHoursChange, columnStats, reco
     },
     elements: { point: { radius: 0, hitRadius: 0, hoverRadius: 0 } }
   });
+  
+  const [newsetpoint, setNewsetpoint] = useState(40);
 
   return (
     <header className="controlBar">
@@ -27,17 +59,26 @@ const ControlBar = ({ cl1pClick, selectedHours, onHoursChange, columnStats, reco
         <div className="lastRun">
           <span className="label">Last Reading</span>
           <span className="value">{columnStats?.lastTime ?? "N/a"}</span>
-          <span className="unit">{columnStats?.lastHeater? `Heater: ${columnStats.lastHeater}` : ""}</span>
+          <span> </span>
         </div>
         <div className="lastTemp">
-          <span className="label">Box Temp</span>
+          <span className="label">SP</span>
+          <span className="value">{columnStats?.setpoint ?? "N/a"}</span>
+          <span className="unit">°C</span>
+          <span className="label">B</span>
           <span className="value">{columnStats?.lastBoxTemp ?? "N/a"}</span>
           <span className="unit">°C</span>
-        </div>
-        <div className="lastTemp">
-          <span className="label">Heater Temp</span>
+          <span className="label">H</span>
           <span className="value">{columnStats?.lastHeaterTemp ?? "N/a"}</span>
           <span className="unit">°C</span>
+        </div>
+        <div className="buttonRow">
+          <button className="setpointup myBUTTon" onClick={() => setNewsetpoint(prev => prev + 1)}>+</button>
+          <button className="setpointdown myBUTTon" onClick={() => setNewsetpoint(prev => prev - 1)}>-</button>
+          <div className="setpoint value">New Setpoint:{newsetpoint}</div>
+          <button className={`setpointsend myBUTTon ${sendStatus === 'sending' ? 'sending' : ''} ${sendStatus === 'success' ? 'success' : ''}`} onClick={handleSend}>
+            {sendStatus === 'sending' ? "..." : "Send"}
+          </button>
         </div>
         <div className="buttonRow">
           <button className="sidebarButton myBUTTon" onClick={toggleSidebar}>

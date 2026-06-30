@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 import sys
 from decimal import Decimal
 import pytz
+import socket
 
 static_dir = os.environ.get('STATIC_FOLDER', '/app/client/build')
 app = Flask(__name__, static_folder=static_dir, static_url_path='/')
@@ -26,6 +27,9 @@ DB_NAME = os.getenv('DB_NAME')
 CL1P_TOKEN = os.getenv('CL1P_TOKEN')
 CL1P_URL = os.getenv('CL1P_URL')
 LOCATION = os.getenv('LOCATION')
+
+HEATER_ESP_IP = os.getenv('HEATER_ESP_IP')
+COLLECTOR_HOST_PORT = os.getenv('COLLECTOR_HOST_PORT')
 
 db_config = {
     'host': DB_HOST,
@@ -68,6 +72,37 @@ def bootstrap_db():
     conn.commit()
     cursor.close()
     conn.close()
+
+
+@app.route('/api/send-command', methods=['POST'])
+def send_command():
+    data = request.json
+    print(f"DEBUG: Received command: {data.get('hex')}", flush=True)
+    hex_str = data.get('hex') 
+    
+    try:
+        prefix = b'\xAA'
+        
+        payload = hex_str.encode('ascii')
+        
+        command_bytes = prefix + payload
+        
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.settimeout(2)
+            s.connect((HEATER_ESP_IP, int(COLLECTOR_HOST_PORT)))
+            s.sendall(command_bytes)
+            # Wait for 1-byte ACK from ESP
+            ack = s.recv(1)
+            print(f"DEBUG: Received ACK: {ack}", flush=True)
+            if ack == b'\x06': # ACK byte
+                return jsonify({"status": "success"}), 200
+            return jsonify({"status": "fail", "error": "No ACK"}), 500
+            
+        return jsonify({"status": "success"}), 200
+    except Exception as e:
+        result = f"Error: {str(e)}"
+        print(f"DEBUG: Socket send result: {result}", flush=True)
+        return jsonify({"status": "fail", "error": str(e)}), 500
 
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
