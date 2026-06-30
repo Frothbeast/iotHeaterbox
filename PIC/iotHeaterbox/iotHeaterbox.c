@@ -151,6 +151,9 @@ const int16_t box_temp_lut[1024] = {
 volatile uint16_t esp_timeout_counter = 0;
 volatile uint8_t esp_active = 1; // 1 = Attempt communication, 0 = Skip communication
 
+volatile uint8_t CONTROL = 0;
+volatile uint8_t EXTRA = 0;
+
 #define HEATER LATCbits.LATC3
 #define FAN    LATCbits.LATC1
 #define LIGHT  LATCbits.LATC2
@@ -171,12 +174,13 @@ volatile uint8_t cursor_mode = LCD_ON_NO_CURSOR;
 uint8_t lcd_line_addrs[] = {LCD_L1, LCD_L2, LCD_L3, LCD_L4};
 
 
-#define ADDR_INIT   0x00
-#define ADDR_FAN    0x01
-#define ADDR_LIGHT  0x02
-#define ADDR_SP     0x04
-#define ADDR_KP     0x06
-#define ADDR_KI     0x08
+#define ADDR_INIT       0x00
+#define ADDR_FAN        0x01
+#define ADDR_LIGHT      0x02
+#define ADDR_CONTROL    0x03
+#define ADDR_SP         0x04
+#define ADDR_KP         0x06
+    #define ADDR_KI     0x08
 
 volatile uint16_t t_h = 0.0;
 volatile uint16_t t_b = 0.0;
@@ -191,17 +195,19 @@ volatile uint8_t wifi_ticks = 0;
 volatile uint8_t menu_state = 0; 
 volatile uint8_t main_index = 4;
 
+#define main_C              140
 #define main_F              170
 #define main_L              174
 #define main_H              178
 #define main_S              184
 
-#define F   0
-#define L   1
-#define H   2
-#define SP  3
+#define C   0
+#define F   1
+#define L   2
+#define H   3
+#define SP  4
 
-volatile uint8_t cursor_position[] = {main_F, main_L, main_H, main_S};
+volatile uint8_t cursor_position[] = {main_C, main_F, main_L, main_H, main_S};
 uint8_t last_menu_state = 0xFF;
 
 volatile uint8_t menu_press = 0, up_press = 0, down_press = 0, select_press = 0;
@@ -420,7 +426,7 @@ void handle_buttons(void){
         
         switch (menu_state){
             case main_menu:
-                sprintf(display_buffer[0], "Main Menu");
+                sprintf(display_buffer[0], "Main Menu Control:%d", CONTROL);
                 sprintf(display_buffer[1], "H:%3d.%1d B:%3d.%1d", t_h / 10, t_h % 10, t_b / 10, t_b % 10);
                 sprintf(display_buffer[2], "F:%d L:%d H:%d", FAN, LIGHT, HEATER);
                 main_index =4;
@@ -449,6 +455,9 @@ void handle_buttons(void){
             case main_menu:
                 if(select_mode){
                     switch(main_index){
+                        case C://control
+                            CONTROL=1;
+                            break;
                         case F://fan
                             FAN=1;
                             break;
@@ -467,7 +476,7 @@ void handle_buttons(void){
                 }
                 else {
                     main_index++;
-                    if (main_index >3) {
+                    if (main_index >4) {
                         main_index = 0;
                     }
                     cursor_mode = LCD_ON_CURSOR;        
@@ -483,16 +492,19 @@ void handle_buttons(void){
             case main_menu:
                 if(select_mode){
                     switch(main_index){
-                        case 0://fan
+                        case C://control
+                            CONTROL=0;
+                            break;
+                        case F://fan
                             FAN=0;
                             break;
-                        case 1://light
+                        case L://light
                             LIGHT=0;
                             break;
-                        case 2://heater
+                        case H://heater
                             HEATER=0;
                             break;
-                        case 3://setpoint
+                        case SP://setpoint
                             box_setpoint = box_setpoint-10;
                             break;
                             
@@ -501,7 +513,7 @@ void handle_buttons(void){
                 }
                 else {
                     if (main_index < 1) {
-                        main_index = 4;
+                        main_index = 5;
                     }
                     main_index--;
 
@@ -519,6 +531,9 @@ void handle_buttons(void){
             switch (main_index){
                 case SP:
                     DATA_EE_WriteInt(ADDR_SP, box_setpoint);
+                    break;
+                case C:
+                    DATA_EE_Write(ADDR_CONTROL, CONTROL);
                     break;
                 case F:
                     DATA_EE_Write(ADDR_FAN, FAN);
@@ -550,7 +565,7 @@ void control_output(void){
         // do nothing
     }
     else{
-        if (t_b <= box_setpoint && t_h/10 <= heater_limit){
+        if (t_b <= box_setpoint && t_h/10 <= heater_limit && CONTROL == 1){
             HEATER = 1;
         }
         else {
@@ -685,11 +700,13 @@ void main(void) {
         DATA_EE_Write(ADDR_INIT, 0xAA);
         DATA_EE_Write(ADDR_FAN, 0);
         DATA_EE_Write(ADDR_LIGHT, 0);
+        DATA_EE_Write(ADDR_CONTROL, 0);
         DATA_EE_WriteInt(ADDR_SP, 400);
     } 
     box_setpoint = DATA_EE_ReadInt(ADDR_SP);
     FAN = DATA_EE_Read(ADDR_FAN);
     LIGHT = DATA_EE_Read(ADDR_LIGHT);
+    CONTROL = DATA_EE_Read(ADDR_CONTROL);
     
           // Splash screen (standard delay allowed here as no other tasks are running)
     __delay_ms(2000);
@@ -718,7 +735,7 @@ void main(void) {
     ADCON0bits.CHS = 0; 
     ADCON0bits.GO = 1;
     
-    sprintf(display_buffer[0], "Main Menu");
+    sprintf(display_buffer[0], "Main Menu Control:%d", CONTROL);
     sprintf(display_buffer[1], "H:%3d.%1d B:%3d.%1d", t_h / 10, t_h % 10, t_b / 10, t_b % 10);
     sprintf(display_buffer[2], "F:%d L:%d H:%d", FAN, LIGHT, HEATER);
     sprintf(display_buffer[3], "");
@@ -750,7 +767,7 @@ void main(void) {
 
                 if (esp_active) {
                     char packet_buffer[24];
-                    sprintf(packet_buffer, "%04X%04X%02X%02X%02X%04X", t_h, t_b, FAN, LIGHT, HEATER, box_setpoint);
+                    sprintf(packet_buffer, "%04X%04X%01X%01X%01X01X02X%04X", t_h, t_b, FAN, LIGHT, HEATER, (CONTROL & 0x01), EXTRA, box_setpoint);
                     
                     if (send_to_esp(packet_buffer, 18)) {
                         sprintf(display_buffer[3], "ESP SUCCESS        ");
@@ -785,7 +802,7 @@ void main(void) {
                 }
 
                 if (menu_state == main_menu){
-                    //sprintf(display_buffer[0], "%04X%04X%02X%02X%02X%04X", t_h, t_b, FAN, LIGHT, HEATER, box_setpoint);
+                    sprintf(display_buffer[0], "Main Menu Control:%d", CONTROL);
                     sprintf(display_buffer[1], "H:%3d.%1d B:%3d.%1d", t_h / 10, t_h % 10, t_b / 10, t_b % 10);
                     sprintf(display_buffer[2], "F:%d L:%d H:%d S:%3d.%1d", FAN, LIGHT, HEATER, box_setpoint / 10, box_setpoint % 10);
 

@@ -17,6 +17,8 @@ mysql -u root -p"${MYSQL_ROOT_PASSWORD}" <<-EOSQL
         fan INT DEFAULT NULL,
         light INT DEFAULT NULL,
         heater INT DEFAULT NULL,
+        control INT DEFAULT NULL,
+        extra INT DEFAULT NULL,
         setpoint DECIMAL(5, 2) DEFAULT NULL,
         RSSI INT DEFAULT NULL,
         PRIMARY KEY (id),

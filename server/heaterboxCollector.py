@@ -29,15 +29,16 @@ def start_collector():
                 data = conn.recv(1024)
                 if data:
                     hex_str = data.decode('ascii').strip()
-                    # 18 chars = 9 bytes
+                    
                     if len(hex_str) == 20:
-                        # Parsing the 9-byte packet
-                        raw_h = int(hex_str[0:4], 16)   # Bytes 0-1
-                        raw_b = int(hex_str[4:8], 16)   # Bytes 2-3
-                        fan = int(hex_str[8:10], 16)    # Byte 4
-                        light = int(hex_str[10:12], 16) # Byte 5
-                        heater = int(hex_str[12:14], 16)# Byte 6
-                        setpoint = int(hex_str[14:18], 16) # Bytes 7-8
+                        raw_h = int(hex_str[0:4], 16)   
+                        raw_b = int(hex_str[4:8], 16)   
+                        fan = int(hex_str[8:9], 16)    
+                        light = int(hex_str[9:10], 16) 
+                        heater = int(hex_str[10:11], 16)
+                        control = int(hex_str[11:12], 16)
+                        extra = int(hex_str[12:14], 16)
+                        setpoint = int(hex_str[14:18], 16) 
                         rssi = int(hex_str[18:20], 16)
                         
                         conn.sendall(b"ACK")
@@ -49,10 +50,10 @@ def start_collector():
 
                         query = """
                             INSERT INTO heaterData 
-                            (datetime, tempBox, tempHeater, fan, light, heater, setpoint, RSSI) 
-                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                            (datetime, tempBox, tempHeater, fan, light, heater, control, extra, setpoint, RSSI) 
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                         """
-                        cursor.execute(query, (now, raw_b/10, raw_h/10, fan, light, heater, setpoint/10, rssi))
+                        cursor.execute(query, (now, raw_b/10, raw_h/10, fan, light, heater, control, extra, setpoint/10, rssi))
 
                         conn_db.commit()
                         cursor.close()
