@@ -767,7 +767,7 @@ void main(void) {
 
                 if (esp_active) {
                     char packet_buffer[24];
-                    sprintf(packet_buffer, "%04X%04X%01X%01X%01X01X02X%04X", t_h, t_b, FAN, LIGHT, HEATER, (CONTROL & 0x01), EXTRA, box_setpoint);
+                    sprintf(packet_buffer, "%04X%04X%01X%01X%01X%01X%02X%04X", t_h, t_b, FAN, LIGHT, HEATER, (CONTROL & 0x01), EXTRA, box_setpoint);
                     
                     if (send_to_esp(packet_buffer, 18)) {
                         sprintf(display_buffer[3], "ESP SUCCESS        ");
